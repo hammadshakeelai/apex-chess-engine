@@ -22,6 +22,7 @@ flowchart TD
     Index --> Bib["08. Landmark Papers Bibliography"]
     Index --> Tax["09. Taxonomy of Top-Level Engines"]
     Index --> FreeData["10. Free Online Datasets Directory"]
+    Index --> Weights["11. Pretrained Weights & Papers Archive"]
 
     Hist --> NNUE
     Hist --> Trans
@@ -31,6 +32,7 @@ flowchart TD
     Search --> Blue
     Blue --> Tax
     Data --> FreeData
+    Bib --> Weights
 ```
 
 ---
