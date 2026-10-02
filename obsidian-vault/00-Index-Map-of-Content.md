@@ -29,6 +29,9 @@ flowchart TD
     Index --> Testing["15. Testing Methodology: SPRT & Tablebases"]
     Index --> SIMD["16. Low-Bit Quantization & SIMD Hardware"]
     Index --> Milestones["17. Development Timelines & Realistic Goals"]
+    Index --> MoE["18. Ensemble Architectures & MoE Cascades"]
+    Index --> RL["19. Reinforcement Learning, TD(λ) & Q-Learning"]
+    Index --> AutoML["20. AutoML, NAS & SPSA Engine Tuning"]
 
     Hist --> NNUE
     Hist --> Trans
@@ -45,6 +48,9 @@ flowchart TD
     Strategy --> Testing
     NNUE --> SIMD
     Strategy --> Milestones
+    Blue --> MoE
+    Blue --> RL
+    Strategy --> AutoML
 ```
 
 ---
@@ -110,7 +116,44 @@ How to build an engine that surpasses Stockfish:
 ### 8. [[08-Landmark-Papers-Bibliography|Landmark Papers & Annotated Bibliography]]
 15+ pivotal research papers with links, author summaries, and algorithmic breakthroughs.
 
+### 9. [[09-Taxonomy-of-Top-Level-Engines|Taxonomy of Top-Level Engines]]
+Architectural comparative breakdown of Stockfish, Leela Chess Zero, Komodo Dragon, Berserk, Torch, and Ethereal.
+
+### 10. [[10-Free-Online-Chess-Datasets|Free Online Chess Datasets]]
+Curated directory of public datasets: Lichess Open Database (5.5B games), CCRL, CC-RL, and 17.5TB Syzygy tablebases.
+
+### 11. [[11-Pretrained-Model-Weights-and-Paper-Archives|Pretrained Model Weights & Paper Archives]]
+Direct download links for official Stockfish `.nnue` nets, Lc0 networks, Maia models, and research archives.
+
+### 12. [[12-Architectural-Decision-Matrix-and-Data-Strategy|Architectural Decision Matrix & Data Strategy]]
+Systematic trade-off analysis balancing latency, memory footprint, throughput, and Elo gains.
+
+### 13. [[13-Advanced-Alpha-Beta-Pruning-and-Extensions|Advanced Alpha-Beta Pruning & Singular Extensions]]
+Algorithmic deep-dive into Reverse Futility Pruning, Probcut, Singular Extensions, and Multi-Cut.
+
+### 14. [[14-Parallel-Search-and-Lazy-SMP|Parallel Search & Lazy SMP]]
+Shared lockless Transposition Tables, helper thread diversification, and multi-core scaling efficiency.
+
+### 15. [[15-Testing-Methodology-SPRT-and-Tablebases|Testing Methodology: SPRT & Tablebases]]
+Sequential Probability Ratio Testing (SPRT) math, log-likelihood ratios, and Cutechess automation.
+
+### 16. [[16-Low-Bit-Quantization-and-SIMD-Hardware|Low-Bit Quantization & SIMD Hardware Execution]]
+Quantization math (INT8/INT4), symmetric scaling, and AVX2/AVX-512 VNNI dot-product assembly.
+
+### 17. [[17-Engine-Development-Timelines-and-Milestones|Engine Development Timelines & Realistic Milestones]]
+Historical development timelines of top engines and realistic milestones for ApexChess.
+
+### 18. [[18-Ensemble-Architectures-and-Mixture-of-Experts|Ensemble Architectures & MoE Cascades]]
+Overcoming the 50-nanosecond latency paradox using Asymmetric Cascades and Game-Phase Mixture of Experts.
+
+### 19. [[19-Reinforcement-Learning-TD-Lambda-and-Q-Learning|Reinforcement Learning, TD(λ) & Q-Learning]]
+Why naive DQN fails in chess, and how Search-Integrated TD-Leaf($\lambda$) and AlphaZero self-play achieve superhuman mastery.
+
+### 20. [[20-AutoML-Hyperparameter-Tuning-and-NAS|AutoML, NAS & SPSA Engine Tuning]]
+Automating neural architecture search for NNUE and automated parameter tuning of 100+ search heuristics via SPSA.
+
 ---
 
 > [!TIP]
 > Use Obsidian's **Graph View** (`Ctrl+G`) to explore connections between mathematical loss functions, feature representations, and search heuristics.
+
