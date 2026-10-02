@@ -28,6 +28,7 @@ flowchart TD
     Index --> LazySMP["14. Parallel Search & Lazy SMP"]
     Index --> Testing["15. Testing Methodology: SPRT & Tablebases"]
     Index --> SIMD["16. Low-Bit Quantization & SIMD Hardware"]
+    Index --> Milestones["17. Development Timelines & Realistic Goals"]
 
     Hist --> NNUE
     Hist --> Trans
@@ -43,6 +44,7 @@ flowchart TD
     AdvSearch --> LazySMP
     Strategy --> Testing
     NNUE --> SIMD
+    Strategy --> Milestones
 ```
 
 ---
