@@ -24,6 +24,10 @@ flowchart TD
     Index --> FreeData["10. Free Online Datasets Directory"]
     Index --> Weights["11. Pretrained Weights & Papers Archive"]
     Index --> Strategy["12. Architectural Decision & Data Strategy"]
+    Index --> AdvSearch["13. Advanced Alpha-Beta & Singular Extensions"]
+    Index --> LazySMP["14. Parallel Search & Lazy SMP"]
+    Index --> Testing["15. Testing Methodology: SPRT & Tablebases"]
+    Index --> SIMD["16. Low-Bit Quantization & SIMD Hardware"]
 
     Hist --> NNUE
     Hist --> Trans
@@ -35,6 +39,10 @@ flowchart TD
     Data --> FreeData
     Bib --> Weights
     Blue --> Strategy
+    Search --> AdvSearch
+    AdvSearch --> LazySMP
+    Strategy --> Testing
+    NNUE --> SIMD
 ```
 
 ---
