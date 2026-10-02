@@ -13,7 +13,7 @@
 [![Obsidian Vault](https://img.shields.io/badge/Obsidian-Research%20Vault-7c3aed.svg)](#-obsidian-research-knowledge-base)
 [![Test Suite](https://img.shields.io/badge/Tests-Passing-success.svg)](#running-automated-tests)
 
-[Explore Interactive Web App](https://hammadshakeelai.github.io/apex-chess-engine/) • [Read Obsidian Vault](obsidian-vault/00-Index-Map-of-Content.md) • [Architecture Blueprint](obsidian-vault/07-Cutting-Edge-Engine-Blueprint.md)
+[Explore Interactive Web App](https://hammadshakeelai.github.io/apex-chess-engine/) • [Master Roadmap](ROADMAP.md) • [Read Obsidian Vault](obsidian-vault/00-Index-Map-of-Content.md) • [Architecture Blueprint](obsidian-vault/07-Cutting-Edge-Engine-Blueprint.md)
 
 </div>
 
