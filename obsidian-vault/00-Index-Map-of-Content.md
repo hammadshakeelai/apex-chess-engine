@@ -21,6 +21,7 @@ flowchart TD
     Index --> Blue["07. The Cutting-Edge Blueprint"]
     Index --> Bib["08. Landmark Papers Bibliography"]
     Index --> Tax["09. Taxonomy of Top-Level Engines"]
+    Index --> FreeData["10. Free Online Datasets Directory"]
 
     Hist --> NNUE
     Hist --> Trans
@@ -29,6 +30,7 @@ flowchart TD
     Trans --> Blue
     Search --> Blue
     Blue --> Tax
+    Data --> FreeData
 ```
 
 ---
