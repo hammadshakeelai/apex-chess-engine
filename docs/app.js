@@ -76,14 +76,24 @@ function playGameOverSound() {
 // ==============================================================================
 const BOTS = {
     stockfish: {
-        name: "Stockfish 17",
-        rating: "3650",
+        name: "Stockfish 19",
+        rating: "3740",
         avatar: "🐟",
         badge: "BOT",
         badgeColor: "#81b64c",
-        description: "World #1 open-source engine powered by Dual-NNUE and ultra-deep Alpha-Beta tactical calculation.",
+        description: "World #1 engine powered by SFNNv16 Dual-NNUE, Threat Inputs, and deep tactical Alpha-Beta calculation.",
         depth: 3,
         style: "tactical"
+    },
+    patricia: {
+        name: "Patricia 5.1",
+        rating: "3550",
+        avatar: "🐰",
+        badge: "BOT",
+        badgeColor: "#ef4444",
+        description: "Adam Kulju's famous 'killer bunny' engine, tuned for super-aggressive king attacks and wild tactical sacrifices.",
+        depth: 3,
+        style: "aggressive"
     },
     lc0: {
         name: "Leela Chess Zero",
@@ -312,6 +322,11 @@ function evaluatePosition(chessGame, botStyle) {
         if (whiteBishops >= 2) score += 35;
         if (blackBishops >= 2) score -= 35;
         score += whiteCenterPawns * 15 - blackCenterPawns * 15;
+    } else if (botStyle === 'aggressive') {
+        // Patricia 5.1: Super aggressive, high mobility, king hunting & sacrifice bias
+        const mobility = chessGame.moves().length;
+        if (chessGame.turn() === 'w') score += mobility * 6;
+        else score -= mobility * 6;
     } else if (botStyle === 'human') {
         // Maia: slight human noise
         score += (Math.random() * 16 - 8);

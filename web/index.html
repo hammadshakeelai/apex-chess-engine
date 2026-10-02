@@ -61,11 +61,11 @@
                     
                     <!-- Opponent Player Card (Top) -->
                     <div class="player-card opponent-card">
-                        <div class="player-avatar" id="opponent-avatar">🤖</div>
+                        <div class="player-avatar" id="opponent-avatar">🐟</div>
                         <div class="player-info">
                             <div class="player-name-row">
-                                <span class="player-name" id="opponent-name">Stockfish 17</span>
-                                <span class="player-rating" id="opponent-rating">3650</span>
+                                <span class="player-name" id="opponent-name">Stockfish 19</span>
+                                <span class="player-rating" id="opponent-rating">3740</span>
                                 <span class="badge-bot">BOT</span>
                             </div>
                             <div class="player-status" id="opponent-status">Engine Ready</div>
@@ -101,7 +101,8 @@
                     <label class="section-label">CHOOSE OPPONENT MODEL</label>
                     <div class="bot-selector-dropdown">
                         <select id="bot-select" class="bot-select">
-                            <option value="stockfish" selected>🟢 Stockfish 17 (Elo 3650) - Tactical King</option>
+                            <option value="stockfish" selected>🟢 Stockfish 19 (Elo 3740) - Tactical King</option>
+                            <option value="patricia">🔴 Patricia 5.1 (Elo 3550) - Super Aggressive</option>
                             <option value="lc0">🔵 Leela Chess Zero (Elo 3550) - Positional Master</option>
                             <option value="alphazero">🟣 AlphaZero (Elo 3450) - Intuitive Sacrifices</option>
                             <option value="maia">🟡 Maia 1900 (Elo 1900) - Human Grandmaster</option>
@@ -109,7 +110,7 @@
                         </select>
                     </div>
                     <div class="bot-description" id="bot-desc">
-                        World #1 open-source engine powered by Dual-NNUE and ultra-deep Alpha-Beta tactical calculation.
+                        World #1 open-source engine powered by SFNNv16 Dual-NNUE, Threat Inputs, and deep tactical Alpha-Beta calculation.
                     </div>
                 </div>
 
