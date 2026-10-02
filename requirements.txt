@@ -1,0 +1,7 @@
+# Core Chess Engine & Neural Network Dependencies
+python-chess>=1.11.0
+numpy>=1.24.0
+pyyaml>=6.0.0
+
+# Optional PyTorch for Neural Backpropagation Training
+torch>=2.0.0

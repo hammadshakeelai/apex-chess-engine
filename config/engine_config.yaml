@@ -1,0 +1,49 @@
+# ==============================================================================
+# ApexChess Engine Configuration
+# ==============================================================================
+
+engine:
+  name: "ApexChess"
+  version: "1.0.0"
+  author: "Apex Research Team"
+
+search:
+  default_depth: 8
+  max_depth: 64
+  transposition_table_mb: 64
+  aspiration_window_delta: 50
+  enable_null_move_pruning: true
+  enable_reverse_futility_pruning: true
+  enable_late_move_reductions: true
+  enable_quiescence: true
+
+models:
+  use_nnue: true
+  use_policy_prior: true
+  nnue:
+    feature_set: "HalfKP"
+    feature_dimension: 40960
+    accumulator_dimension: 256
+    activation: "SCReLU"
+    weights_file: "models/apex_nnue_v1.bin"
+  transformer:
+    embed_dim: 64
+    num_heads: 4
+    num_layers: 4
+    action_space: 4096
+
+training:
+  batch_size: 4096
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  loss_lambda_outcome_blend: 0.20
+  centipawn_scale: 400.0
+  epochs: 50
+  scheduler: "CosineAnnealing"
+  checkpoint_dir: "checkpoints/"
+
+uci_options:
+  Hash: 64
+  Threads: 1
+  UseNNUE: true
+  UsePolicyPrior: true
