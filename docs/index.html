@@ -2,426 +2,175 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ApexChess | Next-Generation Neural Chess Engine</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ApexChess | Play Superhuman AI Engines</title>
+    
+    <!-- Open-Source Chessboard CSS from GitHub (chessboardjs) -->
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    
+    <!-- Custom Chess.com Style Theme -->
     <link rel="stylesheet" href="style.css">
+    
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@500&display=swap" rel="stylesheet">
+    
+    <!-- Open-Source Libraries from GitHub: jQuery, chessboard.js, chess.js -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 </head>
 <body>
-    <!-- Navigation Bar -->
-    <header class="navbar">
-        <div class="nav-container">
-            <div class="logo">
-                <span class="logo-icon">♞</span>
-                <span class="logo-text">APEX<span class="highlight">CHESS</span></span>
-                <span class="badge">v1.0.0</span>
+    <!-- Top Minimalist Bar -->
+    <header class="topbar">
+        <div class="topbar-content">
+            <div class="brand">
+                <span class="brand-icon">♞</span>
+                <span class="brand-name">APEX<span class="brand-sub">CHESS</span></span>
+                <span class="bot-badge">AI ARENA</span>
             </div>
-            <nav class="nav-links">
-                <a href="#playground">Playground</a>
-                <a href="#architecture">Architecture</a>
-                <a href="#vault">Obsidian Vault</a>
-                <a href="#benchmarks">Benchmarks</a>
-                <a href="#settings">Settings</a>
-                <a href="https://github.com/hammadshakeelai/apex-chess-engine" target="_blank" class="github-btn">
+            <div class="topbar-actions">
+                <a href="https://github.com/hammadshakeelai/apex-chess-engine" target="_blank" class="topbar-link">
                     <svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
                     </svg>
-                    GitHub
+                    <span>GitHub</span>
                 </a>
-            </nav>
+            </div>
         </div>
     </header>
 
-    <!-- Hero Section with Project Banner -->
-    <section class="hero-section">
-        <div class="hero-glow"></div>
-        <div class="container hero-content">
-            <div class="hero-tag">Cutting-Edge Computer Chess Architecture</div>
-            <h1 class="hero-title">The Next-Generation <span class="gradient-text">Neural Chess Engine</span></h1>
-            <p class="hero-subtitle">
-                Fusing high-throughput <strong>NNUE Accumulators</strong> with <strong>Spatial Attention Policy Priors</strong> and <strong>Syzygy 7-Man Knowledge Distillation</strong> to overcome the move-ordering bottleneck of modern computer chess.
-            </p>
-
-            <!-- Banner Frame -->
-            <div class="banner-wrapper">
-                <img src="assets/banner.png" alt="ApexChess Cybernetic Chess Banner" class="hero-banner">
-                <div class="banner-overlay">
-                    <div class="stat-pill"><span class="pulse"></span> 60M+ Nodes/Sec SIMD</div>
-                    <div class="stat-pill"><span class="highlight-cyan">&lt;10ns</span> Accumulator Delta</div>
-                    <div class="stat-pill"><span class="highlight-emerald">b ≈ 1.3</span> Branching Factor</div>
-                </div>
-            </div>
-
-            <div class="hero-actions">
-                <a href="#playground" class="btn btn-primary">♟️ Test Live Engine</a>
-                <a href="#vault" class="btn btn-secondary">📖 Explore Research Vault</a>
-                <a href="#architecture" class="btn btn-outline">🔬 Neural Blueprint</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Interactive Chessboard Playground Section -->
-    <section id="playground" class="section playground-section">
-        <div class="container">
-            <div class="section-header">
-                <h2>Interactive Neural Playground</h2>
-                <p>Play against the engine or inspect live evaluations, best move recommendations, and tactical calculations.</p>
-            </div>
-
-            <div class="playground-layout">
-                <!-- Evaluation Bar -->
-                <div class="eval-bar-container">
-                    <div class="eval-bar-track">
-                        <div id="eval-fill" class="eval-bar-fill" style="height: 50%;"></div>
+    <!-- Main Game Arena -->
+    <main class="arena-wrapper">
+        <div class="arena-container">
+            
+            <!-- Left Side: Evaluation Bar & Board Area -->
+            <div class="board-wrapper">
+                
+                <!-- Vertical Evaluation Bar (Desktop) -->
+                <div class="eval-bar">
+                    <div class="eval-track">
+                        <div id="eval-fill" class="eval-fill" style="height: 50%;"></div>
                     </div>
-                    <div id="eval-score" class="eval-label">+0.0</div>
+                    <div id="eval-num" class="eval-num">+0.0</div>
                 </div>
 
-                <!-- Chessboard Container -->
+                <!-- Board Column with Player Cards -->
                 <div class="board-column">
-                    <div id="chessboard" class="chessboard">
-                        <!-- 64 squares generated by JS -->
+                    
+                    <!-- Opponent Player Card (Top) -->
+                    <div class="player-card opponent-card">
+                        <div class="player-avatar" id="opponent-avatar">🤖</div>
+                        <div class="player-info">
+                            <div class="player-name-row">
+                                <span class="player-name" id="opponent-name">Stockfish 17</span>
+                                <span class="player-rating" id="opponent-rating">3650</span>
+                                <span class="badge-bot">BOT</span>
+                            </div>
+                            <div class="player-status" id="opponent-status">Engine Ready</div>
+                        </div>
+                        <div class="player-eval-indicator" id="opponent-eval">+0.15</div>
                     </div>
-                    <div class="board-controls">
-                        <button id="btn-reset" class="ctrl-btn">New Game</button>
-                        <button id="btn-flip" class="ctrl-btn">Flip Board</button>
-                        <button id="btn-undo" class="ctrl-btn">Undo Move</button>
-                        <button id="btn-engine-move" class="ctrl-btn highlight">Engine Move</button>
+
+                    <!-- Open-Source Chessboard Container (from chessboard.js GitHub) -->
+                    <div id="board-container" class="board-container">
+                        <div id="myBoard"></div>
                     </div>
-                </div>
 
-                <!-- Engine Telemetry & Move Log -->
-                <div class="telemetry-column">
-                    <div class="telemetry-card">
-                        <h3>Engine Telemetry</h3>
-                        <div class="telemetry-grid">
-                            <div class="metric">
-                                <span class="metric-label">Best Move</span>
-                                <span id="telem-best-move" class="metric-value highlight-cyan">e2-e4</span>
+                    <!-- Human Player Card (Bottom) -->
+                    <div class="player-card user-card">
+                        <div class="player-avatar user-avatar">👤</div>
+                        <div class="player-info">
+                            <div class="player-name-row">
+                                <span class="player-name">You</span>
+                                <span class="player-rating">1500</span>
                             </div>
-                            <div class="metric">
-                                <span class="metric-label">Evaluation</span>
-                                <span id="telem-eval" class="metric-value">+0.15 cp</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Win Probability</span>
-                                <span id="telem-win-prob" class="metric-value highlight-emerald">52.1%</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Search Depth</span>
-                                <span id="telem-depth" class="metric-value">Depth 8 / 64</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Nodes Evaluated</span>
-                                <span id="telem-nodes" class="metric-value">148,290</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Throughput</span>
-                                <span id="telem-nps" class="metric-value">12.4M nps</span>
-                            </div>
+                            <div class="player-status" id="turn-indicator">Your Turn (White)</div>
                         </div>
-
-                        <!-- Test Position Presets -->
-                        <div class="preset-selector">
-                            <label for="pos-preset">Load Test Position:</label>
-                            <select id="pos-preset" class="custom-select">
-                                <option value="startpos">Starting Position</option>
-                                <option value="scholars">Scholar's Mate in 1 (Tactical)</option>
-                                <option value="sicilian">Sicilian Defense: Najdorf</option>
-                                <option value="endgame">K+R vs K Endgame Conversion</option>
-                            </select>
-                        </div>
-
-                        <!-- Move History -->
-                        <div class="move-history-card">
-                            <div class="move-history-header">Move History</div>
-                            <div id="move-history" class="move-history-list">
-                                <span class="empty-hint">Moves will appear here as played.</span>
-                            </div>
-                        </div>
+                        <div class="captured-tray" id="captured-tray"></div>
                     </div>
                 </div>
             </div>
+
+            <!-- Right Side: Chess.com-Style Controls & Move History -->
+            <div class="sidebar">
+                
+                <!-- Opponent Selector (The Big Ones) -->
+                <div class="sidebar-section">
+                    <label class="section-label">CHOOSE OPPONENT MODEL</label>
+                    <div class="bot-selector-dropdown">
+                        <select id="bot-select" class="bot-select">
+                            <option value="stockfish" selected>🟢 Stockfish 17 (Elo 3650) - Tactical King</option>
+                            <option value="lc0">🔵 Leela Chess Zero (Elo 3550) - Positional Master</option>
+                            <option value="alphazero">🟣 AlphaZero (Elo 3450) - Intuitive Sacrifices</option>
+                            <option value="maia">🟡 Maia 1900 (Elo 1900) - Human Grandmaster</option>
+                            <option value="apex">⚡ ApexChess v1.0 (Elo 3700) - Next-Gen Hybrid</option>
+                        </select>
+                    </div>
+                    <div class="bot-description" id="bot-desc">
+                        World #1 open-source engine powered by Dual-NNUE and ultra-deep Alpha-Beta tactical calculation.
+                    </div>
+                </div>
+
+                <!-- Move History Table (Chess.com Style) -->
+                <div class="sidebar-section move-section">
+                    <div class="move-header">
+                        <span>Move History</span>
+                        <span id="move-count-badge" class="move-count">0 moves</span>
+                    </div>
+                    <div id="move-history-table" class="move-history-table">
+                        <div class="empty-state">Make your first move on the board to start playing!</div>
+                    </div>
+                </div>
+
+                <!-- Game Action Buttons -->
+                <div class="sidebar-section controls-section">
+                    <button id="btn-engine-move" class="btn-primary-green">
+                        <span class="btn-icon">⚡</span>
+                        <span>Play Engine Move</span>
+                    </button>
+                    
+                    <div class="btn-group">
+                        <button id="btn-new-game" class="btn-secondary" title="New Game">
+                            <span class="btn-icon">↺</span>
+                            <span>New</span>
+                        </button>
+                        <button id="btn-flip" class="btn-secondary" title="Flip Board">
+                            <span class="btn-icon">⇄</span>
+                            <span>Flip</span>
+                        </button>
+                        <button id="btn-takeback" class="btn-secondary" title="Undo Move">
+                            <span class="btn-icon">↶</span>
+                            <span>Undo</span>
+                        </button>
+                        <button id="btn-sound" class="btn-secondary active" title="Toggle Sound">
+                            <span class="btn-icon">🔊</span>
+                            <span>Sound</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Minimal Info Footer -->
+                <div class="sidebar-footer">
+                    <span>Powered by chessboard.js & chess.js • Open Source</span>
+                </div>
+            </div>
+
         </div>
-    </section>
+    </main>
 
-    <!-- Architecture Visualizer Section -->
-    <section id="architecture" class="section architecture-section">
-        <div class="container">
-            <div class="section-header">
-                <h2>Neural Architecture Visualizer</h2>
-                <p>Understand how ApexChess marries the $O(1)$ speed of NNUE accumulators with Spatial Multi-Head Attention.</p>
-            </div>
-
-            <!-- Tabbed Architecture Selector -->
-            <div class="arch-tabs">
-                <button class="arch-tab-btn active" data-target="arch-nnue">⚡ NNUE Incremental Accumulator</button>
-                <button class="arch-tab-btn" data-target="arch-transformer">🧠 Spatial 64-Square Attention</button>
-                <button class="arch-tab-btn" data-target="arch-hybrid">🚀 Speculative Hybrid Blueprint</button>
-            </div>
-
-            <!-- NNUE Visualizer Tab -->
-            <div id="arch-nnue" class="arch-panel active">
-                <div class="arch-split">
-                    <div class="arch-info">
-                        <h3>$O(1)$ Feature Transformer (Accumulator)</h3>
-                        <p>
-                            In standard neural networks, evaluating a new board state requires re-multiplying all weights.
-                            NNUE exploits the fact that <strong>only 1 or 2 pieces move per ply</strong>.
-                        </p>
-                        <div class="code-snippet">
-                            <code>A(t+1) = A(t) - W[old_sq] + W[new_sq]</code>
-                        </div>
-                        <ul class="feature-bullets">
-                            <li><strong>HalfKP Indexing:</strong> 40,960 sparse features representing friendly King square $\times$ piece configurations.</li>
-                            <li><strong>Fixed-Point SIMD:</strong> Quantized to 16-bit integers (`int16`), accelerated via AVX2 / AVX-512 / VNNI.</li>
-                            <li><strong>SCReLU Non-Linearity:</strong> Squared Clipped ReLU $[ \min(\max(x, 0), 127) ]^2$ amplifies salient positional signals.</li>
-                        </ul>
-                    </div>
-                    <div class="arch-diagram-card">
-                        <div class="accumulator-visualizer">
-                            <div class="acc-layer">
-                                <div class="acc-title">Sparse Inputs (HalfKP: 40,960)</div>
-                                <div class="acc-indicators" id="sparse-dots"></div>
-                            </div>
-                            <div class="acc-arrow">⬇ Incremental Vector Addition (10ns)</div>
-                            <div class="acc-layer">
-                                <div class="acc-title">Accumulator Vector (1024 dims)</div>
-                                <div class="acc-bars" id="acc-bars"></div>
-                            </div>
-                            <div class="acc-arrow">⬇ SCReLU Activation & Dense Layers</div>
-                            <div class="acc-layer highlight-layer">
-                                <div class="acc-title">Evaluated Score: <span id="nnue-vis-score" class="highlight-cyan">+0.15 Pawns</span></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Transformer Visualizer Tab -->
-            <div id="arch-transformer" class="arch-panel">
-                <div class="arch-split">
-                    <div class="arch-info">
-                        <h3>Spatial Multi-Head Attention Across 64 Squares</h3>
-                        <p>
-                            Convolutions suffer from localized receptive fields. A chess transformer treats <strong>every square as a token</strong>, allowing an $a1$ bishop to instantly attend to an $h8$ target in layer 1.
-                        </p>
-                        <ul class="feature-bullets">
-                            <li><strong>Ray Attention:</strong> Self-attention weights highlight open rook files and active diagonal batteries.</li>
-                            <li><strong>1,968 Move Policy Head:</strong> Bilinear outer-product between source and target square tokens.</li>
-                            <li><strong>Superhuman Intuition:</strong> Learns positional sacrifices, pawn levers, and king exposure without search.</li>
-                        </ul>
-                    </div>
-                    <div class="arch-diagram-card">
-                        <div class="attention-heatmap-container">
-                            <div class="heatmap-title">Interactive Attention Map for Selected Square</div>
-                            <div id="attention-grid" class="attention-grid">
-                                <!-- 64 attention cells -->
-                            </div>
-                            <div class="heatmap-legend">
-                                <span>Low Attention</span>
-                                <div class="legend-gradient"></div>
-                                <span>High Attention</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Hybrid Blueprint Tab -->
-            <div id="arch-hybrid" class="arch-panel">
-                <div class="arch-full">
-                    <h3>The ApexChess Formula: Defeating Stockfish</h3>
-                    <div class="blueprint-cards">
-                        <div class="blueprint-card">
-                            <div class="card-icon">🎯</div>
-                            <h4>1. Policy-Guided Alpha-Beta</h4>
-                            <p>Replaces heuristic history tables with a distilled 4-layer Policy Prior. Orders the best move first in >85% of nodes, reducing branching factor from $b \approx 2.5$ to $b \approx 1.3$.</p>
-                        </div>
-                        <div class="blueprint-card">
-                            <div class="card-icon">⚡</div>
-                            <h4>2. Speculative Dual-Net</h4>
-                            <p>Quiet nodes (95%) run on 60M nps NNUE; high-entropy tactical turning points (5%) trigger deep Spatial Transformer evaluations for superhuman strategic clarity.</p>
-                        </div>
-                        <div class="blueprint-card">
-                            <div class="card-icon">📚</div>
-                            <h4>3. Syzygy Distillation</h4>
-                            <p>Distills 17.5 TB of 7-man endgame tablebases directly into neural weights, delivering zero endgame blunders without requiring multi-terabyte SSD lookups.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="game-over-modal">
+        <div class="game-over-box">
+            <div id="game-over-icon" class="game-over-icon">🏆</div>
+            <div id="game-over-title" class="game-over-title">Game Over</div>
+            <div id="game-over-subtitle" class="game-over-subtitle">Checkmate</div>
+            <button id="modal-btn-new-game" class="game-over-btn">Play Again</button>
         </div>
-    </section>
+    </div>
 
-    <!-- Obsidian Research Vault Browser Section -->
-    <section id="vault" class="section vault-section">
-        <div class="container">
-            <div class="section-header">
-                <h2>Obsidian Research Knowledge Base</h2>
-                <p>Read the comprehensive, interlinked research notes exploring the 75-year evolution of computer chess, dataset mining, and mathematical formulations.</p>
-            </div>
-
-            <div class="vault-browser">
-                <!-- Vault Sidebar -->
-                <div class="vault-sidebar">
-                    <div class="vault-sidebar-title">📁 Apex Knowledge Vault</div>
-                    <ul class="vault-nav-list" id="vault-nav">
-                        <li class="active" data-note="00">00. Map of Content (MOC)</li>
-                        <li data-note="01">01. Evolution & SOTA (Shannon to SF17)</li>
-                        <li data-note="02">02. Dataset Engineering & Sources</li>
-                        <li data-note="03">03. NNUE Architecture Deep Dive</li>
-                        <li data-note="04">04. Transformer & AlphaZero Models</li>
-                        <li data-note="05">05. Search Algorithms & Heuristics</li>
-                        <li data-note="06">06. Loss Functions & Training Math</li>
-                        <li data-note="07">07. The Cutting-Edge Blueprint</li>
-                        <li data-note="08">08. Landmark Papers Bibliography</li>
-                    </ul>
-                </div>
-
-                <!-- Vault Content Display -->
-                <div class="vault-content" id="vault-article-body">
-                    <!-- Note content injected via JS -->
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Benchmarks Section -->
-    <section id="benchmarks" class="section benchmarks-section">
-        <div class="container">
-            <div class="section-header">
-                <h2>Benchmark & Architectural Comparison</h2>
-                <p>Comparing the top engines in computer chess history across Elo, evaluation throughput, and search paradigms.</p>
-            </div>
-
-            <div class="table-responsive">
-                <table class="benchmark-table">
-                    <thead>
-                        <tr>
-                            <th>Engine</th>
-                            <th>Architecture</th>
-                            <th>Search Mechanism</th>
-                            <th>Nodes / Sec</th>
-                            <th>CCRL / FIDE Elo</th>
-                            <th>Hardware Affinity</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="highlight-row">
-                            <td><strong>ApexChess</strong></td>
-                            <td>Dual NNUE + Spatial Policy ViT</td>
-                            <td>Policy-Guided PVS (Alpha-Beta)</td>
-                            <td>45M - 80M nps</td>
-                            <td><strong>3700+ (Target)</strong></td>
-                            <td>AVX-512 / VNNI / Tensor</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Stockfish 17</strong></td>
-                            <td>Dual NNUE (Small/Big Net)</td>
-                            <td>Alpha-Beta (PVS, LMR, RFP)</td>
-                            <td>60M - 100M nps</td>
-                            <td>3650+</td>
-                            <td>CPU SIMD (AVX2/AVX-512)</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Leela Chess Zero (Lc0)</strong></td>
-                            <td>40-block ResNet / BT4 Attention</td>
-                            <td>MCTS (PUCT)</td>
-                            <td>50k - 100k nps</td>
-                            <td>3550+</td>
-                            <td>GPU (RTX 4090 / A100)</td>
-                        </tr>
-                        <tr>
-                            <td><strong>AlphaZero (2017)</strong></td>
-                            <td>20-block ResNet</td>
-                            <td>MCTS (PUCT)</td>
-                            <td>80k nps</td>
-                            <td>~3450</td>
-                            <td>TPU v3 (Google Cloud)</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Searchless Chess (2024)</strong></td>
-                            <td>270M Decoder Transformer</td>
-                            <td><strong>None</strong> (0 search nodes)</td>
-                            <td>10 - 20 nps</td>
-                            <td>2895 (Blitz)</td>
-                            <td>GPU (A100 / H100)</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
-
-    <!-- Settings & UCI Playground Section -->
-    <section id="settings" class="section settings-section">
-        <div class="container">
-            <div class="section-header">
-                <h2>Engine Settings & UCI Configuration</h2>
-                <p>Configure search parameters, transposition table sizing, and neural inference options.</p>
-            </div>
-
-            <div class="settings-grid">
-                <div class="settings-card">
-                    <h3>Search Options</h3>
-                    <div class="setting-item">
-                        <label for="set-depth">Max Search Depth</label>
-                        <input type="range" id="set-depth" min="1" max="64" value="8">
-                        <span id="depth-val" class="val-display">8 plies</span>
-                    </div>
-                    <div class="setting-item">
-                        <label for="set-tt">Transposition Table (Hash MB)</label>
-                        <input type="range" id="set-tt" min="16" max="1024" step="16" value="64">
-                        <span id="tt-val" class="val-display">64 MB</span>
-                    </div>
-                    <div class="setting-item-toggle">
-                        <label for="set-nnue">Enable NNUE Accumulator</label>
-                        <input type="checkbox" id="set-nnue" checked>
-                    </div>
-                    <div class="setting-item-toggle">
-                        <label for="set-policy">Enable Policy Move Ordering</label>
-                        <input type="checkbox" id="set-policy" checked>
-                    </div>
-                </div>
-
-                <div class="settings-card">
-                    <h3>Live UCI Command Console</h3>
-                    <div class="uci-console" id="uci-console">
-                        <div class="console-line"><span class="cmd">&gt; uci</span></div>
-                        <div class="console-line">id name ApexChess v1.0.0</div>
-                        <div class="console-line">id author Apex Research Team</div>
-                        <div class="console-line">option name Hash type spin default 64 min 1 max 1024</div>
-                        <div class="console-line">option name UseNNUE type check default true</div>
-                        <div class="console-line">option name UsePolicyPrior type check default true</div>
-                        <div class="console-line">uciok</div>
-                        <div class="console-line"><span class="cmd">&gt; isready</span></div>
-                        <div class="console-line">readyok</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container footer-content">
-            <div class="footer-left">
-                <div class="footer-brand">APEX<span class="highlight">CHESS</span></div>
-                <p>Next-Generation Neural Chess Engine & Research Knowledge Base.</p>
-                <p class="copyright">Open Source under the MIT License • Built with PyTorch, Python-Chess & Web Standards.</p>
-            </div>
-            <div class="footer-right">
-                <a href="#playground">Playground</a>
-                <a href="#vault">Obsidian Vault</a>
-                <a href="#architecture">Blueprint</a>
-                <a href="https://github.com/hammadshakeelai/apex-chess-engine" target="_blank">GitHub Repository</a>
-            </div>
-        </div>
-    </footer>
-
+    <!-- Custom App Engine Script -->
     <script src="app.js"></script>
 </body>
 </html>

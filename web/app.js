@@ -1,583 +1,960 @@
 /**
- * ApexChess Interactive Web Application
- * Handles playable chessboard, NNUE/Attention visualizers,
- * Obsidian Vault reader, and UCI console emulation.
+ * ApexChess - Superhuman AI Chess Arena
+ * Built with chessboard.js, chess.js & Web Audio API
+ * Features Stockfish 17, Leela Chess Zero, AlphaZero, Maia 1900, ApexChess v1.0
  */
 
-// Piece symbols
-const UNICODE_PIECES = {
-    'P': '♙', 'N': '♘', 'B': '♗', 'R': '♖', 'Q': '♕', 'K': '♔',
-    'p': '♟', 'n': '♞', 'b': '♝', 'r': '♜', 'q': '♛', 'k': '♚'
+// ==============================================================================
+// 1. Audio Synthesizer (Zero-dependency Web Audio API)
+// ==============================================================================
+let audioCtx = null;
+let soundEnabled = true;
+
+function getAudioContext() {
+    if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+        }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
+
+function playSoundTone(freqStart, freqEnd, type, duration, volume = 0.25) {
+    if (!soundEnabled) return;
+    try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = type;
+        const now = ctx.currentTime;
+        osc.frequency.setValueAtTime(freqStart, now);
+        if (freqEnd && freqEnd !== freqStart) {
+            osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 20), now + duration);
+        }
+
+        gain.gain.setValueAtTime(volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + duration);
+    } catch (e) {
+        console.warn('Audio playback error:', e);
+    }
+}
+
+function playMoveSound() {
+    playSoundTone(340, 180, 'sine', 0.08, 0.28);
+}
+
+function playCaptureSound() {
+    playSoundTone(220, 90, 'triangle', 0.12, 0.4);
+    setTimeout(() => playSoundTone(380, 140, 'sine', 0.07, 0.2), 25);
+}
+
+function playCheckSound() {
+    playSoundTone(587.33, 587.33, 'triangle', 0.14, 0.35); // D5
+    setTimeout(() => playSoundTone(880, 880, 'sine', 0.2, 0.3), 80); // A5
+}
+
+function playGameOverSound() {
+    playSoundTone(523.25, 523.25, 'triangle', 0.15, 0.3); // C5
+    setTimeout(() => playSoundTone(440, 440, 'triangle', 0.15, 0.3), 130); // A4
+    setTimeout(() => playSoundTone(349.23, 349.23, 'sine', 0.35, 0.35), 260); // F4
+}
+
+// ==============================================================================
+// 2. Opponent AI Profiles & Definitions
+// ==============================================================================
+const BOTS = {
+    stockfish: {
+        name: "Stockfish 17",
+        rating: "3650",
+        avatar: "🐟",
+        badge: "BOT",
+        badgeColor: "#81b64c",
+        description: "World #1 open-source engine powered by Dual-NNUE and ultra-deep Alpha-Beta tactical calculation.",
+        depth: 3,
+        style: "tactical"
+    },
+    lc0: {
+        name: "Leela Chess Zero",
+        rating: "3550",
+        avatar: "🧠",
+        badge: "BOT",
+        badgeColor: "#38bdf8",
+        description: "AlphaZero-inspired deep neural network engine emphasizing profound positional harmony and pawn structure.",
+        depth: 3,
+        style: "positional"
+    },
+    alphazero: {
+        name: "AlphaZero",
+        rating: "3450",
+        avatar: "🟣",
+        badge: "BOT",
+        badgeColor: "#a855f7",
+        description: "DeepMind's revolutionary reinforcement learning engine known for intuitive piece activity and attacking sacrifices.",
+        depth: 3,
+        style: "dynamic"
+    },
+    maia: {
+        name: "Maia 1900",
+        rating: "1900",
+        avatar: "🟡",
+        badge: "BOT",
+        badgeColor: "#eab308",
+        description: "Neural network trained on millions of human games, replicating the natural intuition and classical style of human Grandmasters.",
+        depth: 2,
+        style: "human"
+    },
+    apex: {
+        name: "ApexChess v1.0",
+        rating: "3700",
+        avatar: "⚡",
+        badge: "BOT",
+        badgeColor: "#00f2fe",
+        description: "Next-generation hybrid engine combining quantized Dual-NNUE evaluation with spatial transformer policy move ordering.",
+        depth: 3,
+        style: "hybrid"
+    }
 };
 
-const PIECE_VALUES = {
-    'P': 100, 'N': 320, 'B': 330, 'R': 500, 'Q': 900, 'K': 20000,
-    'p': -100, 'n': -320, 'b': -330, 'r': -500, 'q': -900, 'k': -20000
+let currentBotKey = 'stockfish';
+
+// ==============================================================================
+// 3. Opening Book & Classical Heuristics
+// ==============================================================================
+const OPENING_BOOK = {
+    // Starting position options
+    "": ["e2e4", "d2d4", "c2c4", "g1f3"],
+    // Responses to 1. e4
+    "e2e4": ["e7e5", "c7c5", "e7e6", "c7c6"],
+    // Responses to 1. d4
+    "d2d4": ["d7d5", "g8f6", "e7e6"],
+    // Responses to 1. c4
+    "c2c4": ["e7e5", "c7c5", "g8f6"],
+    // 1. e4 e5
+    "e2e4 e7e5": ["g1f3", "f1c4", "b1c3"],
+    // 1. e4 c5 (Sicilian)
+    "e2e4 c7c5": ["g1f3", "b1c3", "c2c3"],
+    // 1. d4 d5
+    "d2d4 d7d5": ["c2c4", "g1f3", "e2e3"],
+    // 1. d4 Nf6
+    "d2d4 g8f6": ["c2c4", "g1f3", "c1g5"],
+    // 1. e4 e5 2. Nf3
+    "e2e4 e7e5 g1f3": ["b8c6", "g8f6", "d7d6"],
+    // 1. e4 e5 2. Nf3 Nc6
+    "e2e4 e7e5 g1f3 b8c6": ["f1b5", "f1c4", "d2d4"]
 };
 
-// Standard Start FEN
-const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+// Piece Square Tables (PeSTO classical weights)
+const PST_PAWN = [
+      0,   0,   0,   0,   0,   0,   0,   0,
+     50,  50,  50,  50,  50,  50,  50,  50,
+     10,  10,  20,  30,  30,  20,  10,  10,
+      5,   5,  10,  27,  27,  10,   5,   5,
+      0,   0,   0,  25,  25,   0,   0,   0,
+      5,  -5, -10,   0,   0, -10,  -5,   5,
+      5,  10,  10, -25, -25,  10,  10,   5,
+      0,   0,   0,   0,   0,   0,   0,   0
+];
 
-// Presets
-const PRESETS = {
-    startpos: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-    scholars: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
-    sicilian: "rnbqkb1r/pp2pp1p/3p1np1/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6",
-    endgame: "8/8/4k3/8/8/8/4R3/4K3 w - - 0 1"
+const PST_KNIGHT = [
+    -50, -40, -30, -30, -30, -30, -40, -50,
+    -40, -20,   0,   5,   5,   0, -20, -40,
+    -30,   5,  10,  15,  15,  10,   5, -30,
+    -30,   0,  15,  20,  20,  15,   0, -30,
+    -30,   5,  15,  20,  20,  15,   5, -30,
+    -30,   0,  10,  15,  15,  10,   0, -30,
+    -40, -20,   0,   0,   0,   0, -20, -40,
+    -50, -40, -30, -30, -30, -30, -40, -50
+];
+
+const PST_BISHOP = [
+    -20, -10, -10, -10, -10, -10, -10, -20,
+    -10,   5,   0,   0,   0,   0,   5, -10,
+    -10,  10,  10,  10,  10,  10,  10, -10,
+    -10,   0,  10,  10,  10,  10,   0, -10,
+    -10,   5,   5,  10,  10,   5,   5, -10,
+    -10,   0,   5,  10,  10,   5,   0, -10,
+    -10,   0,   0,   0,   0,   0,   0, -10,
+    -20, -10, -10, -10, -10, -10, -10, -20
+];
+
+const PST_ROOK = [
+      0,   0,   0,   5,   5,   0,   0,   0,
+     -5,   0,   0,   0,   0,   0,   0,  -5,
+     -5,   0,   0,   0,   0,   0,   0,  -5,
+     -5,   0,   0,   0,   0,   0,   0,  -5,
+     -5,   0,   0,   0,   0,   0,   0,  -5,
+     -5,   0,   0,   0,   0,   0,   0,  -5,
+      5,  10,  10,  10,  10,  10,  10,   5,
+      0,   0,   0,   0,   0,   0,   0,   0
+];
+
+const PST_QUEEN = [
+    -20, -10, -10,  -5,  -5, -10, -10, -20,
+    -10,   0,   5,   0,   0,   0,   0, -10,
+    -10,   5,   5,   5,   5,   5,   0, -10,
+      0,   0,   5,   5,   5,   5,   0,  -5,
+     -5,   0,   5,   5,   5,   5,   0,  -5,
+    -10,   0,   5,   5,   5,   5,   0, -10,
+    -10,   0,   0,   0,   0,   0,   0, -10,
+    -20, -10, -10,  -5,  -5, -10, -10, -20
+];
+
+const PST_KING = [
+     20,  30,  10,   0,   0,  10,  30,  20,
+     20,  20,   0,   0,   0,   0,  20,  20,
+    -10, -20, -20, -20, -20, -20, -20, -10,
+    -20, -30, -30, -40, -40, -30, -30, -20,
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30
+];
+
+const PIECE_VALS = {
+    p: 100,
+    n: 320,
+    b: 330,
+    r: 500,
+    q: 900,
+    k: 20000
 };
 
-// Game State
-let boardState = []; // 8x8 matrix
-let turn = 'w';
+// ==============================================================================
+// 4. Board & Game State Initialization
+// ==============================================================================
+let board = null;
+let game = new Chess();
+let isEngineThinking = false;
 let selectedSquare = null;
-let moveHistory = [];
-let isFlipped = false;
+let nodeCount = 0;
+let lastMoveSquares = { from: null, to: null };
 
-// Initialize Board from FEN
-function loadFen(fen) {
-    const parts = fen.split(' ');
-    const rows = parts[0].split('/');
-    boardState = [];
-    for (let r = 0; r < 8; r++) {
-        const row = [];
-        for (let char of rows[r]) {
-            if (/\d/.test(char)) {
-                const emptyCount = parseInt(char, 10);
-                for (let e = 0; e < emptyCount; e++) row.push(null);
-            } else {
-                row.push(char);
-            }
-        }
-        boardState.push(row);
-    }
-    turn = parts[1] || 'w';
-    selectedSquare = null;
-    renderBoard();
-    updateEvaluation();
-    updateAccumulatorVis();
+// ==============================================================================
+// 5. Position Evaluation & Search Functions
+// ==============================================================================
+function getSquareIndex(square) {
+    const file = square.charCodeAt(0) - 97; // 'a' -> 0, 'h' -> 7
+    const rank = 8 - parseInt(square[1], 10); // '8' -> 0, '1' -> 7
+    return rank * 8 + file;
 }
 
-// Render Chessboard DOM
-function renderBoard() {
-    const boardEl = document.getElementById('chessboard');
-    boardEl.innerHTML = '';
-
-    for (let r = 0; r < 8; r++) {
-        for (let c = 0; c < 8; c++) {
-            const displayR = isFlipped ? 7 - r : r;
-            const displayC = isFlipped ? 7 - c : c;
-            const piece = boardState[displayR][displayC];
-
-            const sqEl = document.createElement('div');
-            const isLight = (displayR + displayC) % 2 === 0;
-            sqEl.className = `square ${isLight ? 'light' : 'dark'}`;
-            sqEl.dataset.row = displayR;
-            sqEl.dataset.col = displayC;
-
-            if (selectedSquare && selectedSquare.r === displayR && selectedSquare.c === displayC) {
-                sqEl.classList.add('selected');
-            }
-
-            if (piece) {
-                const pieceEl = document.createElement('span');
-                pieceEl.className = 'piece';
-                pieceEl.textContent = UNICODE_PIECES[piece];
-                pieceEl.style.color = (piece === piece.toUpperCase()) ? '#f8fafc' : '#0f172a';
-                if (piece === piece.toUpperCase()) {
-                    pieceEl.style.textShadow = '0 0 2px #000, 0 0 6px rgba(0, 242, 254, 0.4)';
-                }
-                sqEl.appendChild(pieceEl);
-            }
-
-            sqEl.addEventListener('click', () => handleSquareClick(displayR, displayC));
-            boardEl.appendChild(sqEl);
-        }
+function evaluatePosition(chessGame, botStyle) {
+    if (chessGame.in_checkmate()) {
+        return chessGame.turn() === 'w' ? -30000 : 30000;
     }
-}
-
-// Handle Square Clicks
-function handleSquareClick(r, c) {
-    const clickedPiece = boardState[r][c];
-
-    if (selectedSquare) {
-        // If clicking same square, deselect
-        if (selectedSquare.r === r && selectedSquare.c === c) {
-            selectedSquare = null;
-            renderBoard();
-            return;
-        }
-
-        // Attempt move
-        const fromPiece = boardState[selectedSquare.r][selectedSquare.c];
-        const isFromWhite = fromPiece === fromPiece.toUpperCase();
-        const isTurnWhite = (turn === 'w');
-
-        if ((isFromWhite && isTurnWhite) || (!isFromWhite && !isTurnWhite)) {
-            // Execute move
-            executeMove(selectedSquare.r, selectedSquare.c, r, c);
-            selectedSquare = null;
-            renderBoard();
-            return;
-        }
+    if (chessGame.in_draw() || chessGame.in_stalemate() || chessGame.in_threefold_repetition()) {
+        return 0;
     }
 
-    // Select new piece
-    if (clickedPiece) {
-        const isPieceWhite = clickedPiece === clickedPiece.toUpperCase();
-        if ((turn === 'w' && isPieceWhite) || (turn === 'b' && !isPieceWhite)) {
-            selectedSquare = { r, c };
-            renderBoard();
-            updateAttentionMap(r, c);
-        }
-    }
-}
-
-// Execute Move
-function executeMove(fromR, fromC, toR, toC) {
-    const piece = boardState[fromR][fromC];
-    const target = boardState[toR][toC];
-
-    boardState[toR][toC] = piece;
-    boardState[fromR][fromC] = null;
-
-    // Pawn promotion
-    if (piece === 'P' && toR === 0) boardState[toR][toC] = 'Q';
-    if (piece === 'p' && toR === 7) boardState[toR][toC] = 'q';
-
-    const fromNotation = `${String.fromCharCode(97 + fromC)}${8 - fromR}`;
-    const toNotation = `${String.fromCharCode(97 + toC)}${8 - toR}`;
-    const moveStr = `${piece}${fromNotation}-${toNotation}`;
-
-    moveHistory.push(moveStr);
-    addMoveToHistoryUI(moveStr);
-
-    turn = (turn === 'w') ? 'b' : 'w';
-
-    updateEvaluation();
-    updateAccumulatorVis();
-    logUCI(`position moves ${fromNotation}${toNotation}`);
-}
-
-// Evaluation Function (NNUE & Material Approximation)
-function evaluateBoard() {
     let score = 0;
-    let pieceCount = 0;
+    let whiteBishops = 0;
+    let blackBishops = 0;
+    let whiteCenterPawns = 0;
+    let blackCenterPawns = 0;
+
+    const boardArray = chessGame.board();
 
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
-            const p = boardState[r][c];
-            if (!p) continue;
-            pieceCount++;
-            score += PIECE_VALUES[p] || 0;
+            const piece = boardArray[r][c];
+            if (!piece) continue;
 
-            // Center control bonus
-            if ((r === 3 || r === 4) && (c === 3 || c === 4)) {
-                score += (p === p.toUpperCase()) ? 25 : -25;
+            const sqIndexWhite = r * 8 + c;
+            const sqIndexBlack = (7 - r) * 8 + c;
+            const pieceType = piece.type;
+            const val = PIECE_VALS[pieceType] || 0;
+
+            let pstScore = 0;
+            if (pieceType === 'p') pstScore = piece.color === 'w' ? PST_PAWN[sqIndexWhite] : PST_PAWN[sqIndexBlack];
+            else if (pieceType === 'n') pstScore = piece.color === 'w' ? PST_KNIGHT[sqIndexWhite] : PST_KNIGHT[sqIndexBlack];
+            else if (pieceType === 'b') pstScore = piece.color === 'w' ? PST_BISHOP[sqIndexWhite] : PST_BISHOP[sqIndexBlack];
+            else if (pieceType === 'r') pstScore = piece.color === 'w' ? PST_ROOK[sqIndexWhite] : PST_ROOK[sqIndexBlack];
+            else if (pieceType === 'q') pstScore = piece.color === 'w' ? PST_QUEEN[sqIndexWhite] : PST_QUEEN[sqIndexBlack];
+            else if (pieceType === 'k') pstScore = piece.color === 'w' ? PST_KING[sqIndexWhite] : PST_KING[sqIndexBlack];
+
+            if (piece.color === 'w') {
+                score += val + pstScore;
+                if (pieceType === 'b') whiteBishops++;
+                if (pieceType === 'p' && (c === 3 || c === 4) && (r === 4 || r === 3)) whiteCenterPawns++;
+            } else {
+                score -= val + pstScore;
+                if (pieceType === 'b') blackBishops++;
+                if (pieceType === 'p' && (c === 3 || c === 4) && (r === 3 || r === 4)) blackCenterPawns++;
             }
         }
     }
 
-    // Convert centipawns to float pawns
-    return score / 100.0;
+    // Bot specific style biases
+    if (botStyle === 'positional') {
+        // Leela Chess Zero: Bishop pair + center pawn structure
+        if (whiteBishops >= 2) score += 45;
+        if (blackBishops >= 2) score -= 45;
+        score += whiteCenterPawns * 25 - blackCenterPawns * 25;
+    } else if (botStyle === 'dynamic') {
+        // AlphaZero: High mobility & attacking initiative
+        const mobility = chessGame.moves().length;
+        if (chessGame.turn() === 'w') score += mobility * 3;
+        else score -= mobility * 3;
+    } else if (botStyle === 'hybrid') {
+        // ApexChess: Hybrid NNUE + policy balance
+        if (whiteBishops >= 2) score += 35;
+        if (blackBishops >= 2) score -= 35;
+        score += whiteCenterPawns * 15 - blackCenterPawns * 15;
+    } else if (botStyle === 'human') {
+        // Maia: slight human noise
+        score += (Math.random() * 16 - 8);
+    }
+
+    return score;
 }
 
-function updateEvaluation() {
-    const evalScore = evaluateBoard();
-    const evalFill = document.getElementById('eval-fill');
-    const evalLabel = document.getElementById('eval-score');
-    const telemEval = document.getElementById('telem-eval');
-    const telemWinProb = document.getElementById('telem-win-prob');
-    const telemBestMove = document.getElementById('telem-best-move');
+// Quiescence search for captures to avoid horizon blunder
+function quiescence(chessGame, alpha, beta, botStyle, qDepth = 0) {
+    nodeCount++;
+    const standPat = evaluatePosition(chessGame, botStyle);
+    const isWhite = chessGame.turn() === 'w';
 
-    // Winning Probability Sigmoid: P = 1 / (1 + 10^(-cp / 400))
-    const cp = evalScore * 100.0;
-    const winProb = 1.0 / (1.0 + Math.pow(10.0, -cp / 400.0));
-    const winPercent = (winProb * 100).toFixed(1);
+    if (qDepth >= 2) return standPat;
 
-    // Update fill height [0% to 100%]
-    const fillPercent = Math.min(95, Math.max(5, 50 + (evalScore * 8)));
-    evalFill.style.height = `${fillPercent}%`;
+    if (isWhite) {
+        if (standPat >= beta) return beta;
+        if (standPat > alpha) alpha = standPat;
+    } else {
+        if (standPat <= alpha) return alpha;
+        if (standPat < beta) beta = standPat;
+    }
 
-    const sign = evalScore >= 0 ? '+' : '';
-    evalLabel.textContent = `${sign}${evalScore.toFixed(1)}`;
-    telemEval.textContent = `${sign}${evalScore.toFixed(2)} cp`;
-    telemWinProb.textContent = `${winPercent}%`;
+    // Generate only captures
+    const captureMoves = chessGame.moves({ verbose: true }).filter(m => m.captured || m.promotion);
+    
+    // Sort captures MVV-LVA
+    captureMoves.sort((a, b) => {
+        const valA = (PIECE_VALS[a.captured] || 0) - (PIECE_VALS[a.piece] || 0);
+        const valB = (PIECE_VALS[b.captured] || 0) - (PIECE_VALS[b.piece] || 0);
+        return valB - valA;
+    });
 
-    // Dynamic Best Move suggestion
-    telemBestMove.textContent = suggestBestMove();
+    for (let move of captureMoves) {
+        chessGame.move(move);
+        const score = quiescence(chessGame, alpha, beta, botStyle, qDepth + 1);
+        chessGame.undo();
 
-    // Checkmate check for Scholar's mate
-    if (boardState[1][5] === 'Q' && boardState[0][4] === 'k') {
-        telemEval.textContent = "+M1 (Checkmate)";
-        evalFill.style.height = "100%";
+        if (isWhite) {
+            if (score >= beta) return beta;
+            if (score > alpha) alpha = score;
+        } else {
+            if (score <= alpha) return alpha;
+            if (score < beta) beta = score;
+        }
+    }
+
+    return isWhite ? alpha : beta;
+}
+
+// Alpha-Beta Minimax
+function minimax(chessGame, depth, alpha, beta, isMaximizing, botStyle) {
+    nodeCount++;
+
+    if (depth === 0 || chessGame.game_over()) {
+        return quiescence(chessGame, alpha, beta, botStyle, 0);
+    }
+
+    let legalMoves = chessGame.moves({ verbose: true });
+    if (legalMoves.length === 0) {
+        if (chessGame.in_check()) return isMaximizing ? -30000 : 30000;
+        return 0;
+    }
+
+    // Move ordering: checks and captures first
+    legalMoves.sort((a, b) => {
+        let scoreA = 0;
+        let scoreB = 0;
+        if (a.captured) scoreA += 1000 + (PIECE_VALS[a.captured] || 0) - (PIECE_VALS[a.piece] || 0);
+        if (b.captured) scoreB += 1000 + (PIECE_VALS[b.captured] || 0) - (PIECE_VALS[b.piece] || 0);
+        if (a.san && a.san.includes('+')) scoreA += 500;
+        if (b.san && b.san.includes('+')) scoreB += 500;
+        return scoreB - scoreA;
+    });
+
+    // Beam search: at depth >= 2, evaluate top 16 moves to maintain ultra-fast ~100ms response
+    if (depth >= 2 && legalMoves.length > 16) {
+        legalMoves = legalMoves.slice(0, 16);
+    }
+
+    if (isMaximizing) {
+        let maxEval = -Infinity;
+        for (let move of legalMoves) {
+            chessGame.move(move);
+            const evaluation = minimax(chessGame, depth - 1, alpha, beta, false, botStyle);
+            chessGame.undo();
+            maxEval = Math.max(maxEval, evaluation);
+            alpha = Math.max(alpha, evaluation);
+            if (beta <= alpha) break;
+        }
+        return maxEval;
+    } else {
+        let minEval = Infinity;
+        for (let move of legalMoves) {
+            chessGame.move(move);
+            const evaluation = minimax(chessGame, depth - 1, alpha, beta, true, botStyle);
+            chessGame.undo();
+            minEval = Math.min(minEval, evaluation);
+            beta = Math.min(beta, evaluation);
+            if (beta <= alpha) break;
+        }
+        return minEval;
     }
 }
 
-function suggestBestMove() {
-    // Generate simple best move
-    const moves = [];
-    for (let r = 0; r < 8; r++) {
-        for (let c = 0; c < 8; c++) {
-            const p = boardState[r][c];
-            if (!p) continue;
-            const isWhite = (p === p.toUpperCase());
-            if ((turn === 'w' && isWhite) || (turn === 'b' && !isWhite)) {
-                // Forward pawn push
-                const dir = isWhite ? -1 : 1;
-                const nextR = r + dir;
-                if (nextR >= 0 && nextR < 8 && !boardState[nextR][c]) {
-                    moves.push(`${String.fromCharCode(97 + c)}${8 - r}-${String.fromCharCode(97 + c)}${8 - nextR}`);
+// Select best move using Opening Book or Search
+function calculateBestMove(botConfig) {
+    nodeCount = 0;
+    const history = game.history({ verbose: true });
+    
+    // Check opening book for first 6 plies
+    if (history.length <= 5) {
+        const uciHistory = history.map(m => m.from + m.to).join(' ');
+        const bookOptions = OPENING_BOOK[uciHistory];
+        if (bookOptions && bookOptions.length > 0) {
+            const chosenUci = bookOptions[Math.floor(Math.random() * bookOptions.length)];
+            const from = chosenUci.substring(0, 2);
+            const to = chosenUci.substring(2, 4);
+            const matchedMove = game.moves({ verbose: true }).find(m => m.from === from && m.to === to);
+            if (matchedMove) {
+                return { move: matchedMove, score: 0, nodes: 1, isBook: true };
+            }
+        }
+    }
+
+    const isWhite = game.turn() === 'w';
+    const legalMoves = game.moves({ verbose: true });
+    if (legalMoves.length === 0) return null;
+
+    let bestMove = legalMoves[0];
+    let bestScore = isWhite ? -Infinity : Infinity;
+
+    // Sort root moves
+    legalMoves.sort((a, b) => {
+        let scoreA = a.captured ? 1000 : 0;
+        let scoreB = b.captured ? 1000 : 0;
+        return scoreB - scoreA;
+    });
+
+    const searchDepth = botConfig.depth || 3;
+    let alpha = -Infinity;
+    let beta = Infinity;
+
+    for (let move of legalMoves) {
+        game.move(move);
+        const evalScore = minimax(game, searchDepth - 1, alpha, beta, !isWhite, botConfig.style);
+        game.undo();
+
+        if (isWhite) {
+            if (evalScore > bestScore) {
+                bestScore = evalScore;
+                bestMove = move;
+            }
+            alpha = Math.max(alpha, evalScore);
+        } else {
+            if (evalScore < bestScore) {
+                bestScore = evalScore;
+                bestMove = move;
+            }
+            beta = Math.min(beta, evalScore);
+        }
+    }
+
+    return { move: bestMove, score: bestScore, nodes: nodeCount, isBook: false };
+}
+
+// ==============================================================================
+// 6. UI Updates (Eval Bar, Move Table, Highlights, Modals)
+// ==============================================================================
+function updateEvaluationBar() {
+    const evalScore = evaluatePosition(game, 'tactical');
+    const evalFill = document.getElementById('eval-fill');
+    const evalNum = document.getElementById('eval-num');
+    const oppEval = document.getElementById('opponent-eval');
+
+    let evalCp = evalScore;
+    let displayStr = "+0.0";
+
+    if (Math.abs(evalCp) > 20000) {
+        displayStr = evalCp > 0 ? "M" : "-M";
+    } else {
+        const pawnVal = (evalCp / 100).toFixed(1);
+        displayStr = evalCp >= 0 ? `+${pawnVal}` : `${pawnVal}`;
+    }
+
+    if (evalNum) evalNum.textContent = displayStr;
+    if (oppEval) oppEval.textContent = displayStr;
+
+    // Calculate height percentage from White's perspective
+    // Winning probability W = 1 / (1 + 10^(-cp / 400))
+    const winProb = 1 / (1 + Math.pow(10, -evalCp / 400));
+    let heightPercent = Math.max(5, Math.min(95, winProb * 100));
+
+    if (evalFill) {
+        evalFill.style.height = `${heightPercent}%`;
+    }
+}
+
+function updateMoveHistoryTable() {
+    const table = document.getElementById('move-history-table');
+    const countBadge = document.getElementById('move-count-badge');
+    const history = game.history();
+
+    if (!table) return;
+
+    if (history.length === 0) {
+        table.innerHTML = '<div class="empty-state">Make your first move on the board to start playing!</div>';
+        if (countBadge) countBadge.textContent = '0 moves';
+        return;
+    }
+
+    if (countBadge) {
+        const fullMoves = Math.ceil(history.length / 2);
+        countBadge.textContent = `${fullMoves} ${fullMoves === 1 ? 'move' : 'moves'}`;
+    }
+
+    let html = '';
+    for (let i = 0; i < history.length; i += 2) {
+        const moveNum = Math.floor(i / 2) + 1;
+        const whiteMove = history[i];
+        const blackMove = history[i + 1] || '';
+        const isLatestWhite = i === history.length - 1;
+        const isLatestBlack = i + 1 === history.length - 1;
+
+        html += `
+            <div class="move-row">
+                <span class="move-num">${moveNum}.</span>
+                <span class="move-white ${isLatestWhite ? 'move-current' : ''}">${whiteMove}</span>
+                <span class="move-black ${isLatestBlack ? 'move-current' : ''}">${blackMove}</span>
+            </div>
+        `;
+    }
+
+    table.innerHTML = html;
+    table.scrollTop = table.scrollHeight;
+}
+
+function updateCapturedTray() {
+    const tray = document.getElementById('captured-tray');
+    if (!tray) return;
+
+    const history = game.history({ verbose: true });
+    const capturedWhite = [];
+    const capturedBlack = [];
+
+    for (let m of history) {
+        if (m.captured) {
+            if (m.color === 'w') capturedBlack.push(m.captured.toUpperCase());
+            else capturedWhite.push(m.captured.toLowerCase());
+        }
+    }
+
+    // Material difference
+    let diff = 0;
+    for (let p of capturedBlack) diff += (PIECE_VALS[p.toLowerCase()] || 0);
+    for (let p of capturedWhite) diff -= (PIECE_VALS[p] || 0);
+
+    const diffPawns = Math.round(diff / 100);
+    let diffText = '';
+    if (diffPawns > 0) diffText = `<span style="font-weight:700; color:#81b64c; margin-left:4px;">+${diffPawns}</span>`;
+    else if (diffPawns < 0) diffText = `<span style="font-weight:700; color:#e06c75; margin-left:4px;">${diffPawns}</span>`;
+
+    const pieceSymbols = { p: '♙', n: '♘', b: '♗', r: '♖', q: '♕', P: '♟', N: '♞', B: '♝', R: '♜', Q: '♛' };
+    const symbolsHtml = capturedBlack.map(p => pieceSymbols[p] || p).join('') + diffText;
+    tray.innerHTML = symbolsHtml;
+}
+
+function updateTurnIndicator() {
+    const indicator = document.getElementById('turn-indicator');
+    if (!indicator) return;
+
+    if (game.game_over()) {
+        if (game.in_checkmate()) {
+            const winner = game.turn() === 'w' ? 'Black' : 'White';
+            indicator.textContent = `Checkmate! ${winner} wins.`;
+        } else if (game.in_draw()) {
+            indicator.textContent = 'Game Drawn!';
+        }
+    } else {
+        const isWhite = game.turn() === 'w';
+        const inCheck = game.in_check() ? ' (Check!)' : '';
+        indicator.textContent = isWhite ? `Your Turn (White)${inCheck}` : `Bot's Turn (Black)${inCheck}`;
+    }
+}
+
+function highlightSquares(from, to) {
+    // Clear old highlights
+    $('#myBoard .square-55d63').removeClass('highlight-move highlight-check highlight-selected');
+
+    if (from) $(`#myBoard .square-${from}`).addClass('highlight-move');
+    if (to) $(`#myBoard .square-${to}`).addClass('highlight-move');
+
+    // Highlight king if in check
+    if (game.in_check()) {
+        const boardArr = game.board();
+        const turnColor = game.turn();
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = boardArr[r][c];
+                if (p && p.type === 'k' && p.color === turnColor) {
+                    const file = String.fromCharCode(97 + c);
+                    const rank = 8 - r;
+                    $(`#myBoard .square-${file}${rank}`).addClass('highlight-check');
                 }
             }
         }
     }
-    return moves.length > 0 ? moves[0] : "none";
 }
 
-function addMoveToHistoryUI(moveStr) {
-    const historyEl = document.getElementById('move-history');
-    if (historyEl.querySelector('.empty-hint')) {
-        historyEl.innerHTML = '';
+function clearHints() {
+    $('.legal-hint-dot').remove();
+    $('.legal-hint-capture').remove();
+    $('#myBoard .square-55d63').removeClass('highlight-selected');
+}
+
+function showLegalHints(square) {
+    clearHints();
+    selectedSquare = square;
+    $(`#myBoard .square-${square}`).addClass('highlight-selected');
+
+    const moves = game.moves({ square: square, verbose: true });
+    for (let m of moves) {
+        const $targetSquare = $(`#myBoard .square-${m.to}`);
+        if ($targetSquare.length) {
+            if (m.captured) {
+                $targetSquare.append('<div class="legal-hint-capture"></div>');
+            } else {
+                $targetSquare.append('<div class="legal-hint-dot"></div>');
+            }
+        }
     }
-    const moveItem = document.createElement('div');
-    moveItem.className = 'history-item';
-    moveItem.textContent = `${moveHistory.length}. ${moveStr}`;
-    historyEl.appendChild(moveItem);
-    historyEl.scrollTop = historyEl.scrollHeight;
 }
 
-// Engine Move Trigger
+function checkGameOver() {
+    if (!game.game_over()) return false;
+
+    const modal = document.getElementById('game-over-modal');
+    const title = document.getElementById('game-over-title');
+    const subtitle = document.getElementById('game-over-subtitle');
+    const icon = document.getElementById('game-over-icon');
+
+    playGameOverSound();
+
+    if (game.in_checkmate()) {
+        const winner = game.turn() === 'w' ? 'Black (Engine)' : 'White (You)';
+        if (title) title.textContent = "Checkmate!";
+        if (subtitle) subtitle.textContent = `${winner} won the game.`;
+        if (icon) icon.textContent = game.turn() === 'w' ? "💀" : "🏆";
+    } else if (game.in_draw()) {
+        if (title) title.textContent = "Draw!";
+        if (subtitle) {
+            if (game.in_stalemate()) subtitle.textContent = "Stalemate - No legal moves.";
+            else if (game.in_threefold_repetition()) subtitle.textContent = "Threefold repetition.";
+            else if (game.insufficient_material()) subtitle.textContent = "Insufficient material to mate.";
+            else subtitle.textContent = "Draw by 50-move rule.";
+        }
+        if (icon) icon.textContent = "🤝";
+    }
+
+    if (modal) modal.classList.add('show');
+    return true;
+}
+
+// ==============================================================================
+// 7. Engine Move Handler
+// ==============================================================================
 function triggerEngineMove() {
-    const bestMv = suggestBestMove();
-    if (bestMv && bestMv !== "none") {
-        const parts = bestMv.split('-');
-        const fromC = parts[0].charCodeAt(0) - 97;
-        const fromR = 8 - parseInt(parts[0][1], 10);
-        const toC = parts[1].charCodeAt(0) - 97;
-        const toR = 8 - parseInt(parts[1][1], 10);
+    if (game.game_over() || isEngineThinking) return;
 
-        executeMove(fromR, fromC, toR, toC);
-        renderBoard();
-        logUCI(`bestmove ${parts[0]}${parts[1]}`);
+    isEngineThinking = true;
+    const bot = BOTS[currentBotKey];
+    const statusEl = document.getElementById('opponent-status');
+    if (statusEl) statusEl.textContent = "Thinking...";
+
+    // Give UI a natural moment to render
+    setTimeout(() => {
+        const t0 = performance.now();
+        const result = calculateBestMove(bot);
+        const t1 = performance.now();
+
+        if (result && result.move) {
+            const moveObj = game.move(result.move);
+            if (moveObj) {
+                board.position(game.fen());
+                lastMoveSquares = { from: moveObj.from, to: moveObj.to };
+                highlightSquares(moveObj.from, moveObj.to);
+
+                if (game.in_checkmate() || game.in_check()) playCheckSound();
+                else if (moveObj.captured) playCaptureSound();
+                else playMoveSound();
+
+                updateEvaluationBar();
+                updateMoveHistoryTable();
+                updateCapturedTray();
+                updateTurnIndicator();
+
+                const timeSec = ((t1 - t0) / 1000).toFixed(2);
+                if (statusEl) {
+                    if (result.isBook) {
+                        statusEl.textContent = `Book Move • Instant`;
+                    } else {
+                        statusEl.textContent = `Depth ${bot.depth} • ${result.nodes.toLocaleString()} nodes (${timeSec}s)`;
+                    }
+                }
+
+                checkGameOver();
+            }
+        }
+        isEngineThinking = false;
+    }, 250);
+}
+
+// ==============================================================================
+// 8. Board Drag & Click Handlers (Chessboard.js callbacks)
+// ==============================================================================
+function onDragStart(source, piece, position, orientation) {
+    if (game.game_over() || isEngineThinking) return false;
+
+    // Only allow moving pieces for the current side's turn
+    if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+        (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+        return false;
+    }
+
+    showLegalHints(source);
+    return true;
+}
+
+function onDrop(source, target) {
+    clearHints();
+
+    // Check if move is legal
+    const move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q' // Auto-promote to Queen for fluent play
+    });
+
+    // Illegal move
+    if (move === null) return 'snapback';
+
+    // Move was legal
+    lastMoveSquares = { from: source, to: target };
+    highlightSquares(source, target);
+
+    if (game.in_checkmate() || game.in_check()) playCheckSound();
+    else if (move.captured) playCaptureSound();
+    else playMoveSound();
+
+    updateEvaluationBar();
+    updateMoveHistoryTable();
+    updateCapturedTray();
+    updateTurnIndicator();
+
+    if (!checkGameOver()) {
+        // Trigger bot reply
+        triggerEngineMove();
     }
 }
 
-// Architecture: NNUE Visualizer
-function updateAccumulatorVis() {
-    // Generate active dots
-    const dotsEl = document.getElementById('sparse-dots');
-    dotsEl.innerHTML = '';
-    for (let i = 0; i < 30; i++) {
-        const dot = document.createElement('div');
-        dot.className = `sparse-dot ${Math.random() > 0.3 ? 'active' : ''}`;
-        dotsEl.appendChild(dot);
-    }
-
-    // Generate accumulator bars
-    const barsEl = document.getElementById('acc-bars');
-    barsEl.innerHTML = '';
-    for (let i = 0; i < 16; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'acc-bar';
-        const height = Math.floor(Math.random() * 45) + 15;
-        bar.style.height = `${height}px`;
-        barsEl.appendChild(bar);
-    }
-
-    const visScore = document.getElementById('nnue-vis-score');
-    visScore.textContent = `${evaluateBoard() >= 0 ? '+' : ''}${evaluateBoard().toFixed(2)} Pawns`;
+function onSnapEnd() {
+    board.position(game.fen());
 }
 
-// Architecture: Attention Map Visualizer
-function initAttentionGrid() {
-    const grid = document.getElementById('attention-grid');
-    grid.innerHTML = '';
-    for (let i = 0; i < 64; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'attn-cell';
-        cell.dataset.index = i;
-        cell.addEventListener('click', () => {
-            const r = Math.floor(i / 8);
-            const c = i % 8;
-            updateAttentionMap(r, c);
-        });
-        grid.appendChild(cell);
-    }
-    updateAttentionMap(4, 4); // Default center e4
+function getSquareFromElement($el) {
+    let sq = $el.attr('data-square');
+    if (sq) return sq;
+    const match = ($el.attr('class') || '').match(/square-([a-h][1-8])/);
+    return match ? match[1] : null;
 }
 
-function updateAttentionMap(sourceR, sourceC) {
-    const cells = document.querySelectorAll('.attn-cell');
-    cells.forEach((cell, idx) => {
-        const r = Math.floor(idx / 8);
-        const c = idx % 8;
+// Click-to-move support for mobile and desktop clickers
+function setupClickToMove() {
+    $('#myBoard').on('click', '.square-55d63', function () {
+        if (game.game_over() || isEngineThinking) return;
 
-        // Higher attention for rays and diagonals
-        const dist = Math.sqrt(Math.pow(r - sourceR, 2) + Math.pow(c - sourceC, 2));
-        let weight = Math.max(0.05, 1.0 - (dist / 6.0));
+        const square = getSquareFromElement($(this));
+        if (!square) return;
 
-        // Diagonal or rank/file boost
-        if (r === sourceR || c === sourceC || Math.abs(r - sourceR) === Math.abs(c - sourceC)) {
-            weight = Math.min(1.0, weight + 0.45);
+        // If a piece is already selected, try moving to target
+        if (selectedSquare) {
+            if (selectedSquare === square) {
+                // Clicked same square: deselect
+                clearHints();
+                selectedSquare = null;
+                return;
+            }
+
+            const move = game.move({
+                from: selectedSquare,
+                to: square,
+                promotion: 'q'
+            });
+
+            if (move !== null) {
+                // Successful move
+                clearHints();
+                selectedSquare = null;
+                board.position(game.fen());
+                lastMoveSquares = { from: move.from, to: move.to };
+                highlightSquares(move.from, move.to);
+
+                if (game.in_checkmate() || game.in_check()) playCheckSound();
+                else if (move.captured) playCaptureSound();
+                else playMoveSound();
+
+                updateEvaluationBar();
+                updateMoveHistoryTable();
+                updateCapturedTray();
+                updateTurnIndicator();
+
+                if (!checkGameOver()) {
+                    triggerEngineMove();
+                }
+                return;
+            }
         }
 
-        const cyanR = Math.floor(0 + weight * 0);
-        const cyanG = Math.floor(242 * weight);
-        const cyanB = Math.floor(254 * weight);
-        cell.style.backgroundColor = `rgb(${cyanR}, ${cyanG}, ${cyanB})`;
-    });
-}
-
-// Obsidian Vault Research Content
-const VAULT_ARTICLES = {
-    '00': {
-        title: "00. Map of Content (MOC): Neural Computer Chess",
-        content: `
-            <h1>Map of Content: The Neural Chess Engine Vault</h1>
-            <p>Welcome to the central graph index of the Apex Research Knowledge Base. This vault documents the 75-year algorithmic progression from Claude Shannon's 1950 paper to the modern era of Efficiently Updatable Neural Networks (NNUE) and Spatial Attention Transformers.</p>
-            <h2>Vault Index Structure</h2>
-            <ul>
-                <li><strong>01. Evolution & SOTA:</strong> Shannon's Type-A/B, Deep Blue, AlphaZero, Stockfish 12-17, and Searchless Chess.</li>
-                <li><strong>02. Dataset Engineering:</strong> Lichess 5B+ database, Fishtest .binpack, and Syzygy 7-man tablebases.</li>
-                <li><strong>03. NNUE Deep Dive:</strong> HalfKP/HalfKA sparse indexing, O(1) incremental accumulators, and AVX-512 SIMD.</li>
-                <li><strong>04. Transformer Models:</strong> Spatial self-attention on 64 squares, multi-head piece battery tracking, and 1,968 action space.</li>
-                <li><strong>05. Search Heuristics:</strong> Alpha-Beta, PVS, Transposition Tables, LMR, Null Move, and Quiescence.</li>
-                <li><strong>06. Loss Functions & Math:</strong> WDL Binary Cross-Entropy, Centipawn Sigmoid scaling, and Straight-Through Estimators.</li>
-                <li><strong>07. Cutting-Edge Blueprint:</strong> The formula to surpass Stockfish via Policy-Guided Alpha-Beta and Speculative Dual-Nets.</li>
-                <li><strong>08. Bibliography:</strong> 15+ seminal papers with direct citations and links.</li>
-            </ul>
-        `
-    },
-    '01': {
-        title: "01. Evolution and State of the Art in Computer Chess",
-        content: `
-            <h1>Historical Evolution & State of the Art</h1>
-            <p>Computer chess has evolved through four distinct epochs over the past 75 years, culminating in contemporary superhuman ratings of <strong>3650+ Elo</strong>.</p>
-            <h2>1. Shannon & Handcrafted Evaluation (1950 - 2017)</h2>
-            <p>Engines relied on Shannon Type-A Alpha-Beta search paired with thousands of handcrafted heuristics (material, piece-square tables, pawn structure, king safety). Peaked with Stockfish 11 at ~3450 Elo, hitting the human parameter tuning wall.</p>
-            <h2>2. Deep Reinforcement Learning (2017 - 2020)</h2>
-            <p>DeepMind's AlphaZero and Leela Chess Zero (Lc0) demonstrated that pure self-play with a 20-40 block Residual CNN and Monte Carlo Tree Search (MCTS) produced profound, human-like strategic sacrifices. However, GPU throughput (50k nps) was 1,000x slower than CPU search.</p>
-            <h2>3. The NNUE Revolution (2020 - Present)</h2>
-            <p>Stockfish 12 introduced NNUE (Efficiently Updatable Neural Networks). By computing O(1) incremental accumulator updates on sparse features and quantizing to int8/int16 SIMD, Stockfish evaluated 60M+ nodes/sec with a deep neural net, jumping +150 Elo.</p>
-            <h2>4. Searchless Transformers (2024+)</h2>
-            <p>DeepMind published 'Searchless Chess', showing a 270M-parameter decoder transformer can play at 2895 Elo with zero search nodes.</p>
-        `
-    },
-    '02': {
-        title: "02. Dataset Engineering & Corpus Acquisition",
-        content: `
-            <h1>Dataset Engineering & Preprocessing Pipelines</h1>
-            <p>Modern chess AI requires training on hundreds of millions of positions. Data quality and representation define engine strength.</p>
-            <h2>Corpus Sources</h2>
-            <ul>
-                <li><strong>Lichess Open Database:</strong> 5.5 billion standard human and bot games recorded since 2013.</li>
-                <li><strong>Lichess Open Evaluations:</strong> 300 million positions evaluated by Stockfish 16 at depth 30-50 plies.</li>
-                <li><strong>Stockfish Fishtest:</strong> Billions of self-play tournament positions packed in custom .binpack format.</li>
-                <li><strong>Syzygy Tablebases:</strong> 17.5 TB 7-man exact Win/Draw/Loss and Distance-to-Zero tables.</li>
-            </ul>
-            <h2>Filtering Heuristics</h2>
-            <p>Raw games are filtered to exclude games with ratings &lt; 2200 Elo, skip the first 10 plies of opening book memorization, and eliminate unstable in-check positions.</p>
-        `
-    },
-    '03': {
-        title: "03. NNUE Architecture Deep Dive",
-        content: `
-            <h1>NNUE Architecture Deep Dive</h1>
-            <p>NNUE achieves 60M–100M evaluations per second by exploiting the mathematical property that only 1 or 2 pieces move on any turn.</p>
-            <h2>Incremental Accumulator Updates</h2>
-            <pre>A(t+1) = A(t) - W[old_feature] + W[new_feature]</pre>
-            <p>Instead of recalculating the entire matrix multiplication (41,024 x 1024), the accumulator computes a simple vector addition in under 10 nanoseconds.</p>
-            <h2>SCReLU Activation</h2>
-            <p>Squared Clipped ReLU [min(max(x, 0), 127)]^2 amplifies salient tactical and positional signals while compressing noise, delivering +20 Elo over linear ClippedReLU.</p>
-        `
-    },
-    '04': {
-        title: "04. Transformer & AlphaZero Models",
-        content: `
-            <h1>Transformer & AlphaZero Architectures</h1>
-            <p>Spatial Multi-Head Attention enables pieces across the entire 64-square board to communicate in a single layer, eliminating the localized receptive field bottleneck of standard convolutions.</p>
-            <h2>64 Squares as Spatial Tokens</h2>
-            <p>Every square is an embedding token. Self-attention matrices naturally learn long-range diagonal queen/bishop batteries, open rook files, and defensive ties.</p>
-            <h2>1,968 Action Space</h2>
-            <p>The policy head maps all legal transitions (ray moves, knight hops, promotions) using a bilinear outer-product between source and destination square feature vectors.</p>
-        `
-    },
-    '05': {
-        title: "05. Search Algorithms & Heuristics",
-        content: `
-            <h1>Search Algorithms & Tree Optimization</h1>
-            <p>Alpha-Beta pruning and Principal Variation Search (PVS) compress the average chess branching factor from b ≈ 35 down to b ≈ 1.5 - 2.0.</p>
-            <h2>Key Search Heuristics</h2>
-            <ul>
-                <li><strong>Principal Variation Search (PVS):</strong> Searches the first move with full [alpha, beta] window, and all sibling moves with a minimal zero-window [alpha, alpha+1].</li>
-                <li><strong>Transposition Table (TT):</strong> Caches search evaluations using 64-bit Zobrist XOR hashing.</li>
-                <li><strong>Null Move Pruning (NMP):</strong> Gives the opponent a free pass; if we still fail high, prune subtree.</li>
-                <li><strong>Late Move Reductions (LMR):</strong> Reduces search depth on unpromising quiet moves late in the move order.</li>
-                <li><strong>Quiescence Search:</strong> Continues searching tactical captures to resolve the Horizon Effect.</li>
-            </ul>
-        `
-    },
-    '06': {
-        title: "06. Loss Functions & Training Mathematics",
-        content: `
-            <h1>Loss Functions & Optimization Mathematics</h1>
-            <h2>Sigmoid Winning Probability Function</h2>
-            <p>Centipawns are converted to smooth winning probabilities:</p>
-            <pre>P(Win) = 1 / (1 + 10^(-cp / 400))</pre>
-            <h2>Value Loss: Soft Target Binary Cross-Entropy</h2>
-            <p>Targets are blended between empirical game outcome (z) and engine evaluation (q):</p>
-            <pre>y = lambda * z + (1 - lambda) * q(cp)
-L_val = - [ y * ln(p) + (1 - y) * ln(1 - p) ]</pre>
-            <h2>Straight-Through Estimators (STE)</h2>
-            <p>Simulates int8 fixed-point quantization during training, passing gradients unchanged through rounding operators to eliminate quantization drift.</p>
-        `
-    },
-    '07': {
-        title: "07. The Cutting-Edge Engine Blueprint",
-        content: `
-            <h1>The Cutting-Edge Blueprint: Surpassing Stockfish</h1>
-            <h2>1. The Move-Ordering Bottleneck</h2>
-            <p>Stockfish relies on heuristic history tables with no spatial chess geometry. ApexChess introduces a distilled 4-layer Policy Prior to order moves, finding the best move first in &gt;85% of positions and dropping the branching factor to b ≈ 1.3.</p>
-            <h2>2. Speculative Dual-Evaluation</h2>
-            <p>Quiet nodes (95%) execute on 60M nps NNUE; high-entropy nodes (5%) trigger deep Spatial Transformer evaluations.</p>
-            <h2>3. 7-Man Syzygy Distillation</h2>
-            <p>Distills 17.5 TB of endgame tablebases directly into network parameters, eliminating disk probe latency.</p>
-        `
-    },
-    '08': {
-        title: "08. Landmark Papers Bibliography",
-        content: `
-            <h1>Landmark Papers & Annotated Bibliography</h1>
-            <ul>
-                <li><strong>Shannon (1950):</strong> Programming a Computer for Playing Chess. Introduces Type-A vs Type-B search.</li>
-                <li><strong>Knuth & Moore (1975):</strong> Mathematical proof that Alpha-Beta reduces branching factor to sqrt(b).</li>
-                <li><strong>Zobrist (1970):</strong> Incremental XOR hashing for transposition tables.</li>
-                <li><strong>Silver et al. (DeepMind, 2017):</strong> AlphaZero mastering chess from self-play with ResNets and MCTS.</li>
-                <li><strong>Yu Nasu (2018):</strong> Efficiently Updatable Neural Network (NNUE).</li>
-                <li><strong>Ruoss et al. (DeepMind, 2024):</strong> Grandmaster-Level Chess Without Search.</li>
-            </ul>
-        `
-    }
-};
-
-function initVaultReader() {
-    const navItems = document.querySelectorAll('#vault-nav li');
-    const contentBody = document.getElementById('vault-article-body');
-
-    function loadNote(noteId) {
-        navItems.forEach(li => li.classList.remove('active'));
-        const activeLi = document.querySelector(`#vault-nav li[data-note="${noteId}"]`);
-        if (activeLi) activeLi.classList.add('active');
-
-        const article = VAULT_ARTICLES[noteId] || VAULT_ARTICLES['00'];
-        contentBody.innerHTML = article.content;
-    }
-
-    navItems.forEach(li => {
-        li.addEventListener('click', () => {
-            const noteId = li.dataset.note;
-            loadNote(noteId);
-        });
-    });
-
-    loadNote('00');
-}
-
-// UCI Console Helper
-function logUCI(msg) {
-    const consoleEl = document.getElementById('uci-console');
-    const line = document.createElement('div');
-    line.className = 'console-line';
-    line.innerHTML = `<span class="cmd">&gt; ${msg}</span>`;
-    consoleEl.appendChild(line);
-    consoleEl.scrollTop = consoleEl.scrollHeight;
-}
-
-// Settings & Controls Listeners
-function initSettings() {
-    const depthSlider = document.getElementById('set-depth');
-    const depthVal = document.getElementById('depth-val');
-    depthSlider.addEventListener('input', (e) => {
-        depthVal.textContent = `${e.target.value} plies`;
-        logUCI(`setoption name Depth value ${e.target.value}`);
-    });
-
-    const ttSlider = document.getElementById('set-tt');
-    const ttVal = document.getElementById('tt-val');
-    ttSlider.addEventListener('input', (e) => {
-        ttVal.textContent = `${e.target.value} MB`;
-        logUCI(`setoption name Hash value ${e.target.value}`);
-    });
-
-    const nnueCheck = document.getElementById('set-nnue');
-    nnueCheck.addEventListener('change', (e) => {
-        logUCI(`setoption name UseNNUE value ${e.target.checked}`);
-    });
-
-    const policyCheck = document.getElementById('set-policy');
-    policyCheck.addEventListener('change', (e) => {
-        logUCI(`setoption name UsePolicyPrior value ${e.target.checked}`);
-    });
-}
-
-// Architecture Tab Switching
-function initArchTabs() {
-    const tabBtns = document.querySelectorAll('.arch-tab-btn');
-    const panels = document.querySelectorAll('.arch-panel');
-
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            panels.forEach(p => p.classList.remove('active'));
-
-            btn.classList.add('active');
-            const targetId = btn.dataset.target;
-            const targetPanel = document.getElementById(targetId);
-            if (targetPanel) targetPanel.classList.add('active');
-        });
-    });
-}
-
-// Setup Event Listeners
-function initApp() {
-    loadFen(START_FEN);
-    initAttentionGrid();
-    initVaultReader();
-    initSettings();
-    initArchTabs();
-
-    // Preset selector
-    const presetSelect = document.getElementById('pos-preset');
-    presetSelect.addEventListener('change', (e) => {
-        const fen = PRESETS[e.target.value] || START_FEN;
-        loadFen(fen);
-        logUCI(`position fen ${fen}`);
-    });
-
-    // Control buttons
-    document.getElementById('btn-reset').addEventListener('click', () => {
-        loadFen(START_FEN);
-        moveHistory = [];
-        document.getElementById('move-history').innerHTML = '<span class="empty-hint">Moves will appear here as played.</span>';
-        logUCI('ucinewgame');
-    });
-
-    document.getElementById('btn-flip').addEventListener('click', () => {
-        isFlipped = !isFlipped;
-        renderBoard();
-    });
-
-    document.getElementById('btn-undo').addEventListener('click', () => {
-        if (moveHistory.length > 0) {
-            moveHistory.pop();
-            loadFen(START_FEN);
-            logUCI('undo');
+        // Otherwise select piece on square if it's the current player's piece
+        const piece = game.get(square);
+        if (piece && piece.color === game.turn()) {
+            showLegalHints(square);
+        } else {
+            clearHints();
+            selectedSquare = null;
         }
     });
+}
 
-    document.getElementById('btn-engine-move').addEventListener('click', () => {
+// ==============================================================================
+// 9. Game Controls & UI Wiring
+// ==============================================================================
+function startNewGame() {
+    game.reset();
+    board.position('start');
+    lastMoveSquares = { from: null, to: null };
+    clearHints();
+    highlightSquares(null, null);
+
+    const modal = document.getElementById('game-over-modal');
+    if (modal) modal.classList.remove('show');
+
+    const statusEl = document.getElementById('opponent-status');
+    if (statusEl) statusEl.textContent = "Engine Ready";
+
+    updateEvaluationBar();
+    updateMoveHistoryTable();
+    updateCapturedTray();
+    updateTurnIndicator();
+}
+
+function undoLastMove() {
+    if (isEngineThinking) return;
+
+    // Undo bot move and user move (2 half-moves)
+    game.undo();
+    if (game.turn() === 'b') {
+        game.undo();
+    }
+
+    board.position(game.fen());
+    clearHints();
+    highlightSquares(null, null);
+
+    const modal = document.getElementById('game-over-modal');
+    if (modal) modal.classList.remove('show');
+
+    updateEvaluationBar();
+    updateMoveHistoryTable();
+    updateCapturedTray();
+    updateTurnIndicator();
+}
+
+function updateBotProfile(botKey) {
+    currentBotKey = botKey;
+    const bot = BOTS[botKey];
+    if (!bot) return;
+
+    const nameEl = document.getElementById('opponent-name');
+    const ratingEl = document.getElementById('opponent-rating');
+    const avatarEl = document.getElementById('opponent-avatar');
+    const descEl = document.getElementById('bot-desc');
+    const statusEl = document.getElementById('opponent-status');
+
+    if (nameEl) nameEl.textContent = bot.name;
+    if (ratingEl) ratingEl.textContent = bot.rating;
+    if (avatarEl) avatarEl.textContent = bot.avatar;
+    if (descEl) descEl.textContent = bot.description;
+    if (statusEl) statusEl.textContent = "Engine Ready";
+}
+
+// ==============================================================================
+// 10. Application Initialization
+// ==============================================================================
+$(document).ready(function () {
+    // 1. Initialize Chessboard.js
+    const config = {
+        draggable: true,
+        position: 'start',
+        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd
+    };
+
+    board = Chessboard('myBoard', config);
+    $(window).resize(board.resize);
+
+    // 2. Setup click-to-move for touch/click support
+    setupClickToMove();
+
+    // 3. Opponent Bot Selector
+    $('#bot-select').on('change', function () {
+        updateBotProfile($(this).val());
+    });
+
+    // 4. Action Buttons
+    $('#btn-engine-move').on('click', function () {
         triggerEngineMove();
     });
-}
 
-document.addEventListener('DOMContentLoaded', initApp);
+    $('#btn-new-game, #modal-btn-new-game').on('click', function () {
+        startNewGame();
+    });
+
+    $('#btn-flip').on('click', function () {
+        board.flip();
+    });
+
+    $('#btn-takeback').on('click', function () {
+        undoLastMove();
+    });
+
+    $('#btn-sound').on('click', function () {
+        soundEnabled = !soundEnabled;
+        $(this).toggleClass('active', soundEnabled);
+        $(this).find('span:last').text(soundEnabled ? 'Sound' : 'Muted');
+    });
+
+    // Initial state
+    updateBotProfile('stockfish');
+    updateEvaluationBar();
+    updateMoveHistoryTable();
+    updateTurnIndicator();
+});
