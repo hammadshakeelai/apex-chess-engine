@@ -23,6 +23,7 @@ flowchart TD
     Index --> Tax["09. Taxonomy of Top-Level Engines"]
     Index --> FreeData["10. Free Online Datasets Directory"]
     Index --> Weights["11. Pretrained Weights & Papers Archive"]
+    Index --> Strategy["12. Architectural Decision & Data Strategy"]
 
     Hist --> NNUE
     Hist --> Trans
@@ -33,6 +34,7 @@ flowchart TD
     Blue --> Tax
     Data --> FreeData
     Bib --> Weights
+    Blue --> Strategy
 ```
 
 ---
