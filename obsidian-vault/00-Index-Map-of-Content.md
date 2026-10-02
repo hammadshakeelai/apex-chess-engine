@@ -20,6 +20,7 @@ flowchart TD
     Index --> Math["06. Loss Functions & Training Math"]
     Index --> Blue["07. The Cutting-Edge Blueprint"]
     Index --> Bib["08. Landmark Papers Bibliography"]
+    Index --> Tax["09. Taxonomy of Top-Level Engines"]
 
     Hist --> NNUE
     Hist --> Trans
@@ -27,6 +28,7 @@ flowchart TD
     NNUE --> Blue
     Trans --> Blue
     Search --> Blue
+    Blue --> Tax
 ```
 
 ---
