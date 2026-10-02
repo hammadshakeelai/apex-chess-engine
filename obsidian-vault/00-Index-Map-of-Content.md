@@ -152,6 +152,9 @@ Why naive DQN fails in chess, and how Search-Integrated TD-Leaf($\lambda$) and A
 ### 20. [[20-AutoML-Hyperparameter-Tuning-and-NAS|AutoML, NAS & SPSA Engine Tuning]]
 Automating neural architecture search for NNUE and automated parameter tuning of 100+ search heuristics via SPSA.
 
+### 21. [[21-The-4000-Elo-Frontier-and-Singularity|The 4000 Elo Frontier & Singularity]]
+Mathematical feasibility of 4000 Elo (+260 over Stockfish 19), breaking the move-ordering ceiling ($b \approx 1.3$), and the 5-pillar master plan.
+
 ---
 
 > [!TIP]
