@@ -68,6 +68,7 @@ weights/*.npz
 data/raw/
 *.parquet
 *.npz
+kaggle_logs/
 
 # OS & IDE
 .DS_Store
