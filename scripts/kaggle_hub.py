@@ -160,7 +160,9 @@ def pull_outputs(kernel_id: Optional[str] = None, dest_dir: str = "weights"):
     print("=" * 70)
 
     res = run_kaggle_command(["kernels", "output", kernel_id, "-p", dest_dir])
-    print(res.stdout.strip())
+    lines = [l for l in res.stdout.strip().splitlines() if any(k in l for k in [".pt", ".npz", ".nnue", "apex", "log"])]
+    for l in lines[:10]:
+        print(f"  --> {l}")
     if res.stderr and "Warning" not in res.stderr:
         print(res.stderr.strip())
 

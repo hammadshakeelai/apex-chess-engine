@@ -57,10 +57,7 @@ class ApexEvaluator:
         if board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw():
             return 0  # Draw
 
-        if self.use_nnue:
-            return self.evaluate_nnue(board)
-
-        # Basic material fallback
+        # Material score (side to move)
         piece_values = {
             chess.PAWN: 100,
             chess.KNIGHT: 320,
@@ -71,12 +68,15 @@ class ApexEvaluator:
         score = 0
         for sq, piece in board.piece_map().items():
             val = piece_values.get(piece.piece_type, 0)
-            if piece.color == chess.WHITE:
-                score += val
-            else:
-                score -= val
+            score += val if piece.color == chess.WHITE else -val
+        mat_score = score if board.turn == chess.WHITE else -score
 
-        return score if board.turn == chess.WHITE else -score
+        if self.use_nnue:
+            nnue_score = self.evaluate_nnue(board)
+            # Hybrid blend: 70% neural evaluation + 30% material safety rail
+            return int(round(0.7 * nnue_score + 0.3 * mat_score))
+
+        return mat_score
 
     def get_policy_prior(self, board: chess.Board) -> Dict[chess.Move, float]:
         """
