@@ -9,6 +9,7 @@ import sys
 import time
 import math
 import argparse
+import subprocess
 from typing import Optional, Tuple, List, Dict
 import chess
 
@@ -18,6 +19,42 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.engine.evaluator import ApexEvaluator
 from src.engine.search import SearchEngine, SearchLimits
 from src.engine.board import PIECE_VALUES
+
+
+class CPPEngineBot:
+    """Wrapper around high-performance C++ apex_engine.exe binary."""
+
+    def __init__(self, exe_path: str = "bin/apex_engine.exe", depth: int = 5):
+        self.exe_path = os.path.abspath(exe_path)
+        self.depth = depth
+
+    def search(self, board: chess.Board, limits=None) -> Tuple[chess.Move, int]:
+        fen = board.fen()
+        depth = self.depth
+        if limits:
+            depth = getattr(limits, "max_depth", getattr(limits, "depth", self.depth))
+        input_str = f"position fen {fen}\ngo depth {depth}\nquit\n"
+        res = subprocess.run(
+            [self.exe_path],
+            input=input_str,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+        best_move = None
+        for line in res.stdout.splitlines():
+            if line.startswith("bestmove"):
+                parts = line.split()
+                if len(parts) > 1:
+                    try:
+                        best_move = chess.Move.from_uci(parts[1])
+                    except Exception:
+                        pass
+        if not best_move or best_move not in board.legal_moves:
+            legal = list(board.legal_moves)
+            best_move = legal[0] if legal else chess.Move.null()
+        return best_move, 0
+
 
 
 # ==============================================================================
@@ -314,19 +351,27 @@ def play_game(
 def run_elo_tournament(
     weights_path: Optional[str] = "weights/apex_v1_quant.npz",
     use_nnue: bool = True,
+    use_cpp: bool = False,
     search_depth: int = 3,
     games_per_opponent: int = 4,
 ):
     print("=" * 75)
     print("  APEX CHESS EMPIRICAL ELO TOURNAMENT")
-    print(f"  Model Under Test: {weights_path or 'Handcrafted Material'}")
+    if use_cpp:
+        model_name = f"ApexChess C++ Native Core (AVX2/BMI2 - {search_depth} ply)"
+    else:
+        model_name = weights_path or "Handcrafted Material"
+    print(f"  Model Under Test: {model_name}")
     print(f"  Search Depth:     {search_depth} ply")
     print(f"  Opponent Tiers:   3 (1000 Elo, 1450 Elo, 1750 Elo)")
     print(f"  Total Games:      {3 * games_per_opponent} Games (Alternating White & Black)")
     print("=" * 75)
 
-    evaluator = ApexEvaluator(use_nnue=use_nnue, weights_path=weights_path)
-    engine_apex = SearchEngine(evaluator=evaluator)
+    if use_cpp:
+        engine_apex = CPPEngineBot(depth=search_depth)
+    else:
+        evaluator = ApexEvaluator(use_nnue=use_nnue, weights_path=weights_path)
+        engine_apex = SearchEngine(evaluator=evaluator)
 
     opponents = [
         GreedyMaterialBot(),
@@ -409,13 +454,14 @@ def main():
     parser = argparse.ArgumentParser(description="ApexChess Elo Tournament Benchmark")
     parser.add_argument("--weights", type=str, default="weights/apex_v1_quant.npz", help="Path to weights file (or None for material)")
     parser.add_argument("--no-nnue", action="store_true", help="Disable NNUE and evaluate pure material baseline")
+    parser.add_argument("--cpp", action="store_true", help="Evaluate C++ Native Core Engine (bin/apex_engine.exe)")
     parser.add_argument("--depth", type=int, default=3, help="Search depth per move (default 3)")
     parser.add_argument("--games", type=int, default=4, help="Games per calibrated opponent (default 4)")
     args = parser.parse_args()
 
     use_nnue = not args.no_nnue
     weights_path = None if args.no_nnue else args.weights
-    if weights_path and not os.path.exists(weights_path):
+    if not args.cpp and weights_path and not os.path.exists(weights_path):
         print(f"[WARN] Specified weights {weights_path} not found. Falling back to default material.")
         weights_path = None
         use_nnue = False
@@ -423,6 +469,7 @@ def main():
     run_elo_tournament(
         weights_path=weights_path,
         use_nnue=use_nnue,
+        use_cpp=args.cpp,
         search_depth=args.depth,
         games_per_opponent=args.games,
     )
