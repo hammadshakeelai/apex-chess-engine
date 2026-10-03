@@ -77,3 +77,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# C++ Build artifacts
+bin/*.o
+bin/*.exe
+
