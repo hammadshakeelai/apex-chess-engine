@@ -59,9 +59,15 @@ env.bak/
 venv.bak/
 
 # Large Model weights & Checkpoints
-checkpoints/*.pt
-checkpoints/*.bin
+checkpoints/
+weights/*.pt
+weights/*.npz
 *.binpack
+
+# Data files
+data/raw/
+*.parquet
+*.npz
 
 # OS & IDE
 .DS_Store

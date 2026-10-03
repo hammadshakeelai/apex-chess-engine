@@ -48,6 +48,63 @@ class NNUEWeights:
         self.w_out = (rng.randn(32, 1) / np.sqrt(32)).astype(np.float32)
         self.b_out = np.zeros(1, dtype=np.float32)
 
+    @classmethod
+    def from_file(cls, path: str) -> "NNUEWeights":
+        """Loads weights from .npz or .pt file."""
+        weights = cls()
+        weights.load(path)
+        return weights
+
+    def load(self, path: str):
+        """Loads weights from .npz or .pt checkpoint file."""
+        if path.endswith(".npz"):
+            data = np.load(path)
+            # High-fidelity FP32 format
+            if "feature_weights" in data:
+                self.feature_weights = data["feature_weights"].astype(np.float32)
+                self.feature_bias = data["feature_bias"].astype(np.float32)
+                self.w1 = data["fc1_w"].astype(np.float32)
+                self.b1 = data["fc1_b"].astype(np.float32)
+                self.w2 = data["fc2_w"].astype(np.float32)
+                self.b2 = data["fc2_b"].astype(np.float32)
+                self.w_out = data["out_w"].astype(np.float32)
+                self.b_out = data["out_b"].astype(np.float32)
+            elif "w_feat" in data:
+                # Quantized export format
+                self.feature_weights = data["w_feat"].astype(np.float32) / 255.0
+                self.feature_bias = data["b_feat"].astype(np.float32) / 255.0
+
+                w_fc1 = data["w_fc1"].astype(np.float32) / 64.0
+                self.w1 = w_fc1.T if w_fc1.shape[0] == 32 else w_fc1
+                b_fc1 = data["b_fc1"].astype(np.float32)
+                if np.max(np.abs(b_fc1)) > 10.0:
+                    b_fc1 = b_fc1 / (64.0 * 255.0)
+                self.b1 = b_fc1
+
+                w_fc2 = data["w_fc2"].astype(np.float32) / 64.0
+                self.w2 = w_fc2.T if w_fc2.shape == (32, 32) else w_fc2
+                b_fc2 = data["b_fc2"].astype(np.float32)
+                if np.max(np.abs(b_fc2)) > 10.0:
+                    b_fc2 = b_fc2 / 64.0
+                self.b2 = b_fc2
+
+                w_out = data["w_out"].astype(np.float32)
+                self.w_out = (w_out.T if w_out.shape == (1, 32) else w_out) / 400.0
+                b_out = data["b_out"].astype(np.float32)
+                self.b_out = b_out / 400.0 if np.max(np.abs(b_out)) > 1.0 else b_out
+
+        elif path.endswith(".pt") and HAS_TORCH:
+            ckpt = torch.load(path, map_location="cpu")
+            state = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
+            self.feature_weights = state["feature_embed.weight"].numpy().astype(np.float32)
+            self.feature_bias = state["feature_bias"].numpy().astype(np.float32)
+            self.w1 = state["fc1.weight"].numpy().astype(np.float32).T
+            self.b1 = state["fc1.bias"].numpy().astype(np.float32)
+            self.w2 = state["fc2.weight"].numpy().astype(np.float32).T
+            self.b2 = state["fc2.bias"].numpy().astype(np.float32)
+            self.w_out = state["out.weight"].numpy().astype(np.float32).T
+            self.b_out = state["out.bias"].numpy().astype(np.float32)
+
 
 def screlu(x: np.ndarray, max_val: float = 1.0) -> np.ndarray:
     """Squared Clipped ReLU: (clamp(x, 0, max_val))^2."""

@@ -4,6 +4,7 @@ Unified Neural Evaluator for ApexChess.
 Coordinates NNUE evaluation, Chess Transformer policy priors, and positional analysis.
 """
 
+import os
 from typing import Tuple, List, Optional, Dict
 import chess
 import numpy as np
@@ -16,12 +17,23 @@ from src.models.transformer_policy import ChessTransformerNumpy
 class ApexEvaluator:
     """Unified evaluator integrating NNUE fast inference and Transformer policy priors."""
 
-    def __init__(self, use_nnue: bool = True, use_policy_prior: bool = True):
+    def __init__(
+        self,
+        use_nnue: bool = True,
+        use_policy_prior: bool = True,
+        weights_path: Optional[str] = None,
+    ):
         self.use_nnue = use_nnue
         self.use_policy_prior = use_policy_prior
 
         # Initialize neural models
-        self.nnue = NNUEInference()
+        if weights_path and os.path.exists(weights_path):
+            self.nnue = NNUEInference(weights=NNUEWeights.from_file(weights_path))
+        elif os.path.exists("weights/apex_v1_quant.npz"):
+            self.nnue = NNUEInference(weights=NNUEWeights.from_file("weights/apex_v1_quant.npz"))
+        else:
+            self.nnue = NNUEInference()
+
         self.transformer = ChessTransformerNumpy()
 
     def evaluate_nnue(self, board: chess.Board) -> int:
@@ -96,3 +108,7 @@ class ApexEvaluator:
         probs = exp_arr / np.sum(exp_arr)
 
         return {m: float(p) for m, p in zip(legal_moves, probs)}
+
+
+# Backward compatibility alias
+UnifiedEvaluator = ApexEvaluator
