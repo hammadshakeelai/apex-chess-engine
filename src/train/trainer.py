@@ -112,11 +112,16 @@ class NNUETrainer:
         model_save_path: str = "weights/apex_v1.pt",
         lr: float = 1e-3,
         weight_decay: float = 1e-5,
+        device: Optional[str] = None,
     ):
         self.model_save_path = model_save_path
         self.lr = lr
         self.weight_decay = weight_decay
         self.model = model
+        if HAS_TORCH:
+            self.device = torch.device(device if device else ("cuda" if torch.cuda.is_available() else "cpu"))
+        else:
+            self.device = None
 
     def train_epoch(self, dataloader, model, optimizer, criterion) -> float:
         if not HAS_TORCH:
@@ -129,17 +134,17 @@ class NNUETrainer:
 
         for batch in dataloader:
             optimizer.zero_grad()
-            # Raw output from model is in logits scale (pred corresponds to eval / 400.0)
-            pred = model(
-                batch["w_indices"],
-                batch["w_offsets"],
-                batch["b_indices"],
-                batch["b_offsets"],
-                batch["turns"],
-            )
+            w_idx = batch["w_indices"].to(self.device)
+            w_off = batch["w_offsets"].to(self.device)
+            b_idx = batch["b_indices"].to(self.device)
+            b_off = batch["b_offsets"].to(self.device)
+            turns = batch["turns"].to(self.device)
+            targets = batch["targets"].to(self.device)
+
+            pred = model(w_idx, w_off, b_idx, b_off, turns)
 
             # BCE with logits on target probability in [0, 1]
-            loss = criterion(pred, batch["targets"])
+            loss = criterion(pred, targets)
             loss.backward()
 
             # Gradient clipping to prevent exploding updates
@@ -164,25 +169,27 @@ class NNUETrainer:
 
         with torch.no_grad():
             for batch in dataloader:
-                pred = model(
-                    batch["w_indices"],
-                    batch["w_offsets"],
-                    batch["b_indices"],
-                    batch["b_offsets"],
-                    batch["turns"],
-                )
-                loss = criterion(pred, batch["targets"])
+                w_idx = batch["w_indices"].to(self.device)
+                w_off = batch["w_offsets"].to(self.device)
+                b_idx = batch["b_indices"].to(self.device)
+                b_off = batch["b_offsets"].to(self.device)
+                turns = batch["turns"].to(self.device)
+                targets = batch["targets"].to(self.device)
+
+                pred = model(w_idx, w_off, b_idx, b_off, turns)
+                loss = criterion(pred, targets)
                 total_loss += loss.item()
                 steps += 1
 
                 # Sign agreement: predicted > 0 corresponds to win prob > 0.5
                 pred_win = pred > 0.0
-                target_win = batch["targets"] > 0.5
+                target_win = targets > 0.5
                 correct += (pred_win == target_win).sum().item()
-                total_samples += batch["targets"].size(0)
+                total_samples += targets.size(0)
 
         val_loss = total_loss / max(1, steps)
         accuracy = (correct / max(1, total_samples)) * 100.0
+        return val_loss, accuracy
         return val_loss, accuracy
 
     def save_checkpoint(self, model, epoch: int, loss: float, val_acc: float = 0.0):
@@ -284,12 +291,16 @@ def run_training_pipeline(
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, collate_fn=collate_halfkp)
 
     # 2. Model & Optimizer
-    model = PyTorchNNUE()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
+    print(f"[DEVICE] Training on: {device} ({device_name})")
+
+    model = PyTorchNNUE().to(device)
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
     criterion = nn.BCEWithLogitsLoss()
 
-    trainer = NNUETrainer(model=model, model_save_path=save_pt, lr=lr)
+    trainer = NNUETrainer(model=model, model_save_path=save_pt, lr=lr, device=str(device))
 
     print(f"\n[TRAIN] Beginning training for {epochs} epochs (Train: {train_size:,} | Val: {val_size:,})...")
     print(f"        Batch Size: {batch_size} | Initial LR: {lr}")

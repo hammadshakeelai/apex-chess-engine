@@ -155,6 +155,9 @@ Automating neural architecture search for NNUE and automated parameter tuning of
 ### 21. [[21-The-4000-Elo-Frontier-and-Singularity|The 4000 Elo Frontier & Singularity]]
 Mathematical feasibility of 4000 Elo (+260 over Stockfish 19), breaking the move-ordering ceiling ($b \approx 1.3$), and the 5-pillar master plan.
 
+### 22. [[22-C-Plus-Plus-Core-Architecture-and-GPU-Bridge|C++ Core Engine Architecture & Cloud GPU Bridge]]
+The $1,000\times$ speed dividend: bitboard representations, BMI2 `_pext_u64`, AVX2 SIMD accumulator loops, free cloud GPU training (Colab/Kaggle), and the Master Study Syllabus.
+
 ---
 
 > [!TIP]
