@@ -132,7 +132,14 @@ def clean_and_slice_dataset(
     return df
 
 
-def main():
+def download_and_extract_tactics(output_path: str, limit: int = 100000, raw_dir: str = "data/raw") -> pd.DataFrame:
+    """Download tactics parquet if missing and slice clean records."""
+    os.makedirs(raw_dir, exist_ok=True)
+    raw_file = os.path.join(raw_dir, "tactics_ssingh22.parquet")
+    download_with_progress(TACTICS_PARQUET_URL, raw_file)
+    lim = None if limit <= 0 else limit
+    return clean_and_slice_dataset(raw_file, output_path, limit=lim)
+
     parser = argparse.ArgumentParser(description="ApexChess Dataset Acquisition Pipeline")
     parser.add_argument("--limit", type=int, default=100000, help="Number of positions to slice (default 100k, 0 for all 2.6M)")
     parser.add_argument("--raw_dir", type=str, default="data/raw", help="Directory for raw downloaded parquet")

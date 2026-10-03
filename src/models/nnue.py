@@ -63,6 +63,7 @@ class NNUEWeights:
             if "feature_weights" in data:
                 self.feature_weights = data["feature_weights"].astype(np.float32)
                 self.feature_bias = data["feature_bias"].astype(np.float32)
+                self.hidden_dim = self.feature_bias.shape[0]
                 self.w1 = data["fc1_w"].astype(np.float32)
                 self.b1 = data["fc1_b"].astype(np.float32)
                 self.w2 = data["fc2_w"].astype(np.float32)
@@ -73,6 +74,7 @@ class NNUEWeights:
                 # Quantized export format
                 self.feature_weights = data["w_feat"].astype(np.float32) / 255.0
                 self.feature_bias = data["b_feat"].astype(np.float32) / 255.0
+                self.hidden_dim = self.feature_bias.shape[0]
 
                 w_fc1 = data["w_fc1"].astype(np.float32) / 64.0
                 self.w1 = w_fc1.T if w_fc1.shape[0] == 32 else w_fc1

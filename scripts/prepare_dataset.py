@@ -97,6 +97,10 @@ def vectorize_dataset(parquet_path: str, output_npz_path: str, max_records: int 
     print(f"[OK] Saved {output_npz_path} ({size_mb:.2f} MB)")
 
 
+# Convenience alias
+vectorize_parquet_dataset = vectorize_dataset
+
+
 def main():
     parser = argparse.ArgumentParser(description="ApexChess Dataset Vectorizer")
     parser.add_argument("--input", type=str, default="data/tactics_50k.parquet", help="Path to input clean parquet")
