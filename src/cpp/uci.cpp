@@ -1,13 +1,29 @@
 #include "uci.h"
 #include "movegen.h"
+#include "evaluate.h"
+#include "book.h"
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <fstream>
 
 namespace Apex {
 
 UCIEngine::UCIEngine() {
     pos.set_startpos();
+    // Auto-load NNUE binary if present
+    std::ifstream test_f("weights/apex_nnue.bin", std::ios::binary);
+    if (test_f.good()) {
+        test_f.close();
+        load_nnue("weights/apex_nnue.bin");
+    }
+
+    // Auto-load Polyglot Opening Book if present
+    std::ifstream test_b("weights/apex_book.bin", std::ios::binary);
+    if (test_b.good()) {
+        test_b.close();
+        GlobalBook.load("weights/apex_book.bin");
+    }
 }
 
 void UCIEngine::handle_position(std::istringstream& iss) {
@@ -76,10 +92,29 @@ void UCIEngine::loop() {
         iss >> cmd;
 
         if (cmd == "uci") {
-            std::cout << "id name ApexChess 1.0 (C++ Core)" << std::endl;
+            std::cout << "id name ApexChess 1.0 (C++ Core + AVX2 NNUE)" << std::endl;
             std::cout << "id author Apex Deep Neural Research" << std::endl;
             std::cout << "option name Hash type spin default 32 min 1 max 1024" << std::endl;
+            std::cout << "option name EvalFile type string default weights/apex_nnue.bin" << std::endl;
+            std::cout << "option name UseNNUE type check default true" << std::endl;
+            std::cout << "option name BookFile type string default weights/apex_book.bin" << std::endl;
+            std::cout << "option name OwnBook type check default true" << std::endl;
             std::cout << "uciok" << std::endl;
+        } else if (cmd == "setoption") {
+            std::string name_tok, opt_name, val_tok, opt_val;
+            iss >> name_tok >> opt_name;
+            if (iss >> val_tok >> opt_val) {
+                if (opt_name == "EvalFile") {
+                    load_nnue(opt_val);
+                } else if (opt_name == "UseNNUE") {
+                    set_nnue_enabled(opt_val == "true");
+                } else if (opt_name == "BookFile") {
+                    GlobalBook.load(opt_val);
+                } else if (opt_name == "OwnBook") {
+                    if (opt_val == "false") GlobalBook.close();
+                    else GlobalBook.load("weights/apex_book.bin");
+                }
+            }
         } else if (cmd == "isready") {
             std::cout << "readyok" << std::endl;
         } else if (cmd == "ucinewgame") {

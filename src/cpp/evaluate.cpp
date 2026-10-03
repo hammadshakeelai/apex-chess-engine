@@ -1,7 +1,27 @@
 #include "evaluate.h"
+#include "nnue.h"
 #include <algorithm>
+#include <cmath>
 
 namespace Apex {
+
+static bool nnue_enabled = false;
+
+bool load_nnue(const std::string& path) {
+    bool ok = GlobalNNUE.load(path);
+    if (ok) {
+        nnue_enabled = true;
+    }
+    return ok;
+}
+
+bool is_nnue_enabled() {
+    return nnue_enabled && GlobalNNUE.is_loaded();
+}
+
+void set_nnue_enabled(bool enabled) {
+    nnue_enabled = enabled;
+}
 
 // Material values [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING]
 static const int mg_value[6] = { 82, 337, 365, 477, 1025, 0 };
@@ -192,9 +212,16 @@ int evaluate(const Position& pos) {
     // Tapered evaluation interpolation
     int mg_weight = std::min(24, game_phase);
     int eg_weight = 24 - mg_weight;
-    int eval = (mg_score * mg_weight + eg_score * eg_weight) / 24;
+    int classical_eval = (mg_score * mg_weight + eg_score * eg_weight) / 24;
+    classical_eval = (pos.turn() == WHITE) ? classical_eval : -classical_eval;
 
-    return (pos.turn() == WHITE) ? eval : -eval;
+    if (is_nnue_enabled()) {
+        int nnue_score = GlobalNNUE.evaluate(pos);
+        // Verified 70% neural evaluation + 30% material safety anchor
+        return static_cast<int>(std::round(0.7f * nnue_score + 0.3f * classical_eval));
+    }
+
+    return classical_eval;
 }
 
 } // namespace Apex

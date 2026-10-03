@@ -25,6 +25,8 @@ public:
 
     void make_move(Move m, StateInfo& state);
     void unmake_move(Move m, const StateInfo& state);
+    void make_null_move(StateInfo& state);
+    void unmake_null_move(const StateInfo& state);
 
     bool is_square_attacked(Square sq, Color by_color) const;
     bool in_check() const;
@@ -38,6 +40,10 @@ public:
     uint8_t castling() const { return castling_rights; }
     Square en_passant() const { return en_passant_sq; }
     uint64_t hash() const { return zobrist_key; }
+    int get_halfmove_clock() const { return halfmove_clock; }
+
+    bool is_repetition(int ply) const;
+    bool is_draw(int ply) const;
 
     void print() const;
 
@@ -60,6 +66,9 @@ private:
     int halfmove_clock;
     int fullmove_number;
     uint64_t zobrist_key;
+
+    uint64_t history_stack[1024];
+    int history_ply;
 
     static uint64_t ZobristPieces[12][64];
     static uint64_t ZobristTurn;

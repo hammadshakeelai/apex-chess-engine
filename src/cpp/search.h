@@ -34,8 +34,8 @@ public:
     void resize(size_t size_mb);
     void clear();
 
-    bool probe(uint64_t key, int depth, int alpha, int beta, int& out_score, Move& out_move);
-    void store(uint64_t key, int depth, int score, TTFlag flag, Move best_move);
+    bool probe(uint64_t key, int depth, int alpha, int beta, int ply, int& out_score, Move& out_move);
+    void store(uint64_t key, int depth, int score, TTFlag flag, Move best_move, int ply);
 
 private:
     TTEntry* table = nullptr;
@@ -71,6 +71,7 @@ private:
 
     Move killer_moves[MAX_PLY][2];
     int history_table[2][64][64];
+    double lmr_table[64][64];
 
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
     int allocated_time_ms;

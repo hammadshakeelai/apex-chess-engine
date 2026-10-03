@@ -1,8 +1,10 @@
 #include "search.h"
 #include "evaluate.h"
+#include "book.h"
 #include <iostream>
 #include <algorithm>
 #include <cstring>
+#include <cmath>
 
 namespace Apex {
 
@@ -30,7 +32,7 @@ void TranspositionTable::clear() {
     }
 }
 
-bool TranspositionTable::probe(uint64_t key, int depth, int alpha, int beta, int& out_score, Move& out_move) {
+bool TranspositionTable::probe(uint64_t key, int depth, int alpha, int beta, int ply, int& out_score, Move& out_move) {
     size_t idx = key % count;
     const TTEntry& entry = table[idx];
 
@@ -39,6 +41,9 @@ bool TranspositionTable::probe(uint64_t key, int depth, int alpha, int beta, int
         if (entry.depth >= depth) {
             int score = entry.score;
             // Adjust mate score for ply
+            if (score > MATE_SCORE - 100) score -= ply;
+            else if (score < -MATE_SCORE + 100) score += ply;
+
             if (entry.flag == TT_EXACT) {
                 out_score = score;
                 return true;
@@ -56,9 +61,13 @@ bool TranspositionTable::probe(uint64_t key, int depth, int alpha, int beta, int
     return false;
 }
 
-void TranspositionTable::store(uint64_t key, int depth, int score, TTFlag flag, Move best_move) {
+void TranspositionTable::store(uint64_t key, int depth, int score, TTFlag flag, Move best_move, int ply) {
     size_t idx = key % count;
     TTEntry& entry = table[idx];
+
+    // Normalize mate score to root ply
+    if (score > MATE_SCORE - 100) score += ply;
+    else if (score < -MATE_SCORE + 100) score -= ply;
 
     // Always overwrite if deeper or new key
     if (entry.key != key || depth >= entry.depth) {
@@ -73,6 +82,16 @@ void TranspositionTable::store(uint64_t key, int depth, int score, TTFlag flag, 
 Searcher::Searcher() : tt(32), nodes_evaluated(0), stop_requested(false), allocated_time_ms(0) {
     std::memset(killer_moves, 0, sizeof(killer_moves));
     std::memset(history_table, 0, sizeof(history_table));
+
+    for (int d = 0; d < 64; ++d) {
+        for (int m = 0; m < 64; ++m) {
+            if (d == 0 || m == 0) {
+                lmr_table[d][m] = 0;
+            } else {
+                lmr_table[d][m] = 0.75 + std::log(d) * std::log(m) / 2.25;
+            }
+        }
+    }
 }
 
 void Searcher::stop() {
@@ -184,6 +203,11 @@ int Searcher::pvs(Position& pos, int depth, int alpha, int beta, int ply, bool i
     if (stop_requested) return 0;
     if (ply >= MAX_PLY - 1) return evaluate(pos);
 
+    // 1. Repetition and 50-move rule detection
+    if (ply > 0 && pos.is_draw(ply)) {
+        return 0;
+    }
+
     bool in_check = pos.in_check();
     if (in_check) depth++; // Check extension
 
@@ -195,8 +219,28 @@ int Searcher::pvs(Position& pos, int depth, int alpha, int beta, int ply, bool i
     Move tt_move = MOVE_NONE;
     int tt_score = 0;
 
-    if (tt.probe(pos.hash(), depth, alpha, beta, tt_score, tt_move)) {
+    if (tt.probe(pos.hash(), depth, alpha, beta, ply, tt_score, tt_move)) {
         if (!is_pv) return tt_score;
+    }
+
+    Color us = pos.turn();
+
+    // Null Move Pruning (NMP) for non-PV nodes
+    Bitboard non_pawns = pos.pieces(us, KNIGHT) | pos.pieces(us, BISHOP) | pos.pieces(us, ROOK) | pos.pieces(us, QUEEN);
+    if (!is_pv && !in_check && depth >= 3 && non_pawns) {
+        int static_eval = evaluate(pos);
+        if (static_eval >= beta) {
+            StateInfo null_state;
+            pos.make_null_move(null_state);
+            int R = 2 + depth / 6;
+            int null_score = -pvs(pos, depth - 1 - R, -beta, -beta + 1, ply + 1, false);
+            pos.unmake_null_move(null_state);
+
+            if (stop_requested) return 0;
+            if (null_score >= beta) {
+                return (null_score >= MATE_SCORE - 100) ? beta : null_score;
+            }
+        }
     }
 
     MoveList moves;
@@ -209,7 +253,6 @@ int Searcher::pvs(Position& pos, int depth, int alpha, int beta, int ply, bool i
 
     // Score moves
     int scores[256];
-    Color us = pos.turn();
     for (int i = 0; i < moves.count; ++i) {
         Move m = moves[i];
         if (m == tt_move) {
@@ -303,7 +346,7 @@ int Searcher::pvs(Position& pos, int depth, int alpha, int beta, int ply, bool i
     if (best_score <= orig_alpha) flag = TT_UPPERBOUND;
     else if (best_score >= beta) flag = TT_LOWERBOUND;
 
-    tt.store(pos.hash(), depth, best_score, flag, best_move);
+    tt.store(pos.hash(), depth, best_score, flag, best_move, ply);
     return best_score;
 }
 
@@ -311,6 +354,14 @@ Move Searcher::search(Position& pos, const SearchLimits& limits) {
     nodes_evaluated = 0;
     stop_requested = false;
     start_time = std::chrono::high_resolution_clock::now();
+
+    // 1. Probe Opening Book (instant 0ms Grandmaster response)
+    Move book_move = GlobalBook.probe(pos);
+    if (book_move != MOVE_NONE) {
+        std::cout << "info string book move " << move_to_uci(book_move) << std::endl;
+        std::cout << "bestmove " << move_to_uci(book_move) << std::endl;
+        return book_move;
+    }
 
     // Time allocation
     Color us = pos.turn();
@@ -332,7 +383,20 @@ Move Searcher::search(Position& pos, const SearchLimits& limits) {
     best_move = root_moves[0];
 
     for (int d = 1; d <= max_depth; ++d) {
-        int score = pvs(pos, d, -INFINITY_SCORE, INFINITY_SCORE, 0, true);
+        int score = 0;
+        if (d >= 4) {
+            int delta = 50;
+            int alpha = std::max(-INFINITY_SCORE, best_score - delta);
+            int beta = std::min(INFINITY_SCORE, best_score + delta);
+            score = pvs(pos, d, alpha, beta, 0, true);
+
+            // If score falls outside window, re-search with full window
+            if (score <= alpha || score >= beta) {
+                score = pvs(pos, d, -INFINITY_SCORE, INFINITY_SCORE, 0, true);
+            }
+        } else {
+            score = pvs(pos, d, -INFINITY_SCORE, INFINITY_SCORE, 0, true);
+        }
 
         if (stop_requested && d > 1) {
             break;
@@ -341,7 +405,7 @@ Move Searcher::search(Position& pos, const SearchLimits& limits) {
         best_score = score;
         Move current_best = MOVE_NONE;
         int dummy_score = 0;
-        tt.probe(pos.hash(), d, -INFINITY_SCORE, INFINITY_SCORE, dummy_score, current_best);
+        tt.probe(pos.hash(), d, -INFINITY_SCORE, INFINITY_SCORE, 0, dummy_score, current_best);
         if (current_best != MOVE_NONE) {
             best_move = current_best;
         }

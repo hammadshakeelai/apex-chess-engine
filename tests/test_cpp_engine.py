@@ -51,7 +51,7 @@ class TestCPPEngine:
 
     def test_uci_protocol_flow(self):
         out = self._run_cpp(["uci", "isready"])
-        assert "id name ApexChess 1.0 (C++ Core)" in out
+        assert "ApexChess 1.0 (C++ Core" in out
         assert "uciok" in out
         assert "readyok" in out
 

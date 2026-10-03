@@ -66,6 +66,7 @@ void Position::clear() {
     halfmove_clock = 0;
     fullmove_number = 1;
     zobrist_key = 0;
+    history_ply = 0;
 }
 
 void Position::put_piece(Piece p, Square sq) {
@@ -180,6 +181,9 @@ bool Position::set_fen(const std::string& fen) {
     halfmove_clock = halfmove;
     fullmove_number = fullmove;
     zobrist_key = compute_zobrist();
+
+    history_ply = 0;
+    history_stack[history_ply++] = zobrist_key;
 
     return true;
 }
@@ -324,9 +328,17 @@ void Position::make_move(Move m, StateInfo& state) {
     // Toggle turn
     side_to_move = ~side_to_move;
     zobrist_key ^= ZobristTurn;
+
+    if (history_ply < 1024) {
+        history_stack[history_ply++] = zobrist_key;
+    }
 }
 
 void Position::unmake_move(Move m, const StateInfo& state) {
+    if (history_ply > 0) {
+        history_ply--;
+    }
+
     Square from = move_from(m);
     Square to = move_to(m);
     MoveFlag flag = move_flag(m);
@@ -362,6 +374,52 @@ void Position::unmake_move(Move m, const StateInfo& state) {
     en_passant_sq = state.en_passant_sq;
     halfmove_clock = state.halfmove_clock;
     zobrist_key = state.zobrist_key;
+}
+
+void Position::make_null_move(StateInfo& state) {
+    state.castling_rights = castling_rights;
+    state.en_passant_sq = en_passant_sq;
+    state.halfmove_clock = halfmove_clock;
+    state.captured_piece = NO_PIECE;
+    state.zobrist_key = zobrist_key;
+
+    zobrist_key ^= ZobristEnPassant[en_passant_sq];
+    en_passant_sq = SQ_NONE;
+
+    side_to_move = ~side_to_move;
+    zobrist_key ^= ZobristTurn;
+
+    if (history_ply < 1024) {
+        history_stack[history_ply++] = zobrist_key;
+    }
+}
+
+void Position::unmake_null_move(const StateInfo& state) {
+    if (history_ply > 0) {
+        history_ply--;
+    }
+
+    side_to_move = ~side_to_move;
+    castling_rights = state.castling_rights;
+    en_passant_sq = state.en_passant_sq;
+    halfmove_clock = state.halfmove_clock;
+    zobrist_key = state.zobrist_key;
+}
+
+bool Position::is_repetition(int ply) const {
+    int end = std::min(halfmove_clock, history_ply - 1);
+    for (int i = 2; i <= end; i += 2) {
+        if (history_stack[history_ply - 1 - i] == zobrist_key) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Position::is_draw(int ply) const {
+    if (halfmove_clock >= 100) return true;
+    if (ply > 0 && is_repetition(ply)) return true;
+    return false;
 }
 
 void Position::print() const {

@@ -13,6 +13,8 @@ g++ -O3 -std=c++20 -mavx2 -mbmi2 -static -static-libgcc -static-libstdc++ -I src
     src/cpp/position.cpp ^
     src/cpp/movegen.cpp ^
     src/cpp/evaluate.cpp ^
+    src/cpp/nnue.cpp ^
+    src/cpp/book.cpp ^
     src/cpp/search.cpp ^
     src/cpp/uci.cpp ^
     src/cpp/main.cpp ^
